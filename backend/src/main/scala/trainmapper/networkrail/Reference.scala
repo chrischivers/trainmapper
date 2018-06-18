@@ -4,7 +4,9 @@ import com.github.tototoshi.csv.CSVReader
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.Decoder
 import io.circe.parser._
-import trainmapper.{LatLng, StanoxCode, TipLocCode}
+import trainmapper.Shared.{LatLng, StanoxCode, TipLocCode}
+import uk.me.jstott.jcoord.OSRef
+
 import scala.io.Source
 import scala.util.Try
 
@@ -45,10 +47,18 @@ object Reference extends StrictLogging {
       easting  <- recordMap.get("Easting").flatMap(safeToDouble)
       northing <- recordMap.get("Northing").flatMap(safeToDouble)
 //      _ = println("easting and northing: " + easting + ", " + northing)
-      latLng <- LatLng.fromEastingNorthing(easting, northing)
+      latLng <- latLngFromEastingNorthing(easting, northing)
 //      _ = println("latlng: " + latLng)
     } yield latLng
 
   private def safeToDouble(str: String) = Try(str.toDouble).toOption
+
+  private def latLngFromEastingNorthing(easting: Double, northing: Double): Option[LatLng] =
+    Try {
+      val osRef  = new OSRef(easting, northing)
+      val latLng = osRef.toLatLng
+      latLng.toWGS84()
+      LatLng(latLng.getLat, latLng.getLng)
+    }.toOption
 
 }

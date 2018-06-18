@@ -5,11 +5,12 @@ import stompa.{StompConfig, Topic}
 
 object Config {
 
-  case class Config(movementTopic: Topic, stompConfig: StompConfig)
+  case class TrainMapperConfig(movementTopic: Topic, googleMapsApiKey: String, stompConfig: StompConfig)
 
   def apply(config: TypesafeConfig = ConfigFactory.load()) =
-    Config(
+    TrainMapperConfig(
       movementTopic = Topic(config.getString("networkRail.movement-topic")),
+      googleMapsApiKey = config.getString("google-maps-api-key"),
       stompConfig = StompConfig(
         config.getString("networkRail.feed.host"),
         config.getInt("networkRail.feed.port"),

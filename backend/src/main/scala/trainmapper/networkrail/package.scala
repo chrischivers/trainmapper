@@ -2,6 +2,7 @@ package trainmapper
 
 import io.circe.Decoder.Result
 import io.circe.{Decoder, HCursor}
+import trainmapper.Shared._
 
 package object networkrail {
 

@@ -7,7 +7,7 @@ import fs2.async.mutable.Queue
 import io.circe.Error
 import io.circe.parser.decode
 import stompa.Message
-import trainmapper.http.MovementPacket
+import trainmapper.Shared.MovementPacket
 
 trait MovementMessageHandler {
 

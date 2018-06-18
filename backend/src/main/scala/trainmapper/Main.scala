@@ -4,7 +4,8 @@ import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
 import stompa.fs2.Fs2MessageHandler
 import stompa.{Message, StompClient}
-import trainmapper.http.{MovementPacket, WsServer}
+import trainmapper.Shared.MovementPacket
+import trainmapper.server.ServerWithWebsockets
 import trainmapper.networkrail._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -24,7 +25,7 @@ object Main extends App with StrictLogging {
     _                    <- networkRailClient.subscribeToTopic(config.movementTopic, stompClient, stompHandler)
     _ <- MovementMessageHandler()
       .handleIncomingMessages(inboundMessageQueue, outboundMessageQueue)
-      .concurrently { WsServer(outboundMessageQueue).stream(List.empty, IO.unit) }
+      .concurrently { ServerWithWebsockets(outboundMessageQueue, config.googleMapsApiKey).stream(List.empty, IO.unit) }
       .compile
       .drain
   } yield ()

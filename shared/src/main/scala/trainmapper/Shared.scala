@@ -19,6 +19,12 @@ object Shared {
     implicit val encoder: Encoder[ServiceCode] = Encoder[ServiceCode](a => Json.fromString(a.value))
   }
 
+  case class ScheduleTrainId(value: String)
+  object ScheduleTrainId {
+    implicit val decoder: Decoder[ScheduleTrainId] = Decoder.decodeString.map(ScheduleTrainId(_))
+    implicit val encoder: Encoder[ScheduleTrainId] = Encoder[ScheduleTrainId](a => Json.fromString(a.value))
+  }
+
   sealed trait EventType {
     val string: String
   }
@@ -110,18 +116,14 @@ object Shared {
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
   }
 
-  case class JourneyDetails(originStationName: String)
+//  case class JourneyDetails(originStationName: String)
+//
+//  object JourneyDetails {
+//    implicit val encoder: Encoder[JourneyDetails] = deriveEncoder[JourneyDetails]
+//    implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
+//  }
 
-  object JourneyDetails {
-    implicit val encoder: Encoder[JourneyDetails] = deriveEncoder[JourneyDetails]
-    implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
-  }
-
-  case class MovementPacket(trainId: TrainId,
-                            serviceCode: ServiceCode,
-                            latLng: LatLng,
-                            actualTimeStamp: Long,
-                            journeyDetails: JourneyDetails)
+  case class MovementPacket(trainId: TrainId, serviceCode: ServiceCode, latLng: LatLng, actualTimeStamp: Long)
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]

@@ -1,5 +1,6 @@
 import sbt.Keys.libraryDependencies
-import sbtcrossproject.{crossProject, CrossType}
+import sbtcrossproject.CrossPlugin.autoImport.crossProject
+import sbtcrossproject.CrossType
 
 val stompaVersion = "0.1.0-SNAPSHOT"
 val scalaLoggingVersion = "3.5.0"
@@ -25,7 +26,7 @@ def includeInTrigger(f: java.io.File): Boolean =
   }
 
 lazy val shared =
-  (crossProject(JSPlatform, JVMPlatform).crossType(CrossType.Pure) in file("shared"))
+  crossProject(JSPlatform, JVMPlatform).crossType(CrossType.Pure).in(file("shared"))
     .settings(commonSettings)
     .settings(
       libraryDependencies ++= Seq(
@@ -56,7 +57,9 @@ lazy val backend = (project in file("backend"))
       "io.chiv" %% "stompa-fs2" % stompaVersion,
       "com.github.tototoshi" %% "scala-csv" % "1.3.5",
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
-      "com.typesafe" % "config" % "1.3.3")
+      "com.typesafe" % "config" % "1.3.3",
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "com.github.etaty" %% "rediscala" % "1.8.0")
       ++ Seq(
         "org.http4s"     %% "http4s-circe",
         "org.http4s"     %% "http4s-blaze-server",
@@ -87,10 +90,10 @@ lazy val frontend = (project in file("frontend"))
     resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
     libraryDependencies ++= Seq(
       "org.scala-js" %%% "scalajs-dom" % scalaJsDomV,
+      "be.doeraene" %%% "scalajs-jquery" % "0.9.3",
       "io.surfkit" %%% "scalajs-google-maps" % "0.0.3-SNAPSHOT"
     )
   )
-
   .dependsOn(sharedJs)
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Ywarn-unused-import", "-Xfatal-warnings", "-language:higherKinds")

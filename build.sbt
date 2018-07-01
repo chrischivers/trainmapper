@@ -6,6 +6,7 @@ val stompaVersion = "0.1.0-SNAPSHOT"
 val scalaLoggingVersion = "3.5.0"
 val circeVersion = "0.9.3"
 val http4sVersion = "0.18.12"
+val doobieVersion  = "0.5.3"
 val scalaJsDomV = "0.9.6"
 val scalaTagsV = "0.6.7"
 
@@ -59,7 +60,15 @@ lazy val backend = (project in file("backend"))
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-      "com.github.etaty" %% "rediscala" % "1.8.0")
+      "com.github.etaty" %% "rediscala" % "1.8.0",
+      "org.flywaydb" % "flyway-core" % "5.1.1")
+      ++ Seq(
+      "org.tpolecat"               %% "doobie-core"             % doobieVersion,
+      "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
+      "org.tpolecat"               %% "doobie-postgres"         % doobieVersion,
+      "org.tpolecat"               %% "doobie-scalatest"        % doobieVersion % "test",
+      "org.tpolecat"               %% "doobie-h2"               % doobieVersion % "test"
+    )
       ++ Seq(
         "org.http4s"     %% "http4s-circe",
         "org.http4s"     %% "http4s-blaze-server",
@@ -72,7 +81,6 @@ lazy val backend = (project in file("backend"))
     (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
     reStart := (reStart dependsOn (fastOptJS in (frontend, Compile))).evaluated,
     watchSources ++= (watchSources in frontend).value,
-//    mainClass in reStart := Some("trainmapper.server.Server")
     mainClass in reStart := Some("trainmapper.Main")
   )
   .dependsOn(sharedJvm)

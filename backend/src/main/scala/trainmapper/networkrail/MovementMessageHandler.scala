@@ -1,5 +1,6 @@
 package trainmapper.networkrail
 
+import cats.data.OptionT
 import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
 import fs2.{Pipe, Sink}
@@ -7,7 +8,7 @@ import fs2.async.mutable.Queue
 import io.circe.Error
 import io.circe.parser.decode
 import stompa.Message
-import trainmapper.Shared.{MovementPacket, TrainId}
+import trainmapper.Shared.{JourneyDetails, MovementPacket, TrainId}
 import trainmapper.cache.Cache
 
 trait MovementMessageHandler {
@@ -45,11 +46,19 @@ object MovementMessageHandler extends StrictLogging {
 
     private def toMovementPacket: Pipe[IO, TrainMovementMessage, Option[MovementPacket]] =
       (in: fs2.Stream[IO, TrainMovementMessage]) =>
-        in.map(
-          msg =>
-            msg.stanoxCode
-              .flatMap(Reference.latLngFor)
-              .map(latLng => MovementPacket(msg.trainId, msg.trainServiceCode, latLng, msg.actualTimestamp)))
+        in.evalMap(msg =>
+          (for {
+            activationRec     <- OptionT(cache.get(msg.trainId))
+            stanoxCode        <- OptionT.fromOption[IO](msg.stanoxCode)
+            latLng            <- OptionT.fromOption[IO](Reference.latLngFor(stanoxCode))
+            originStationName <- OptionT.fromOption[IO](Reference.stationNameFor(activationRec.originStanox))
+          } yield {
+            MovementPacket(msg.trainId,
+                           msg.trainServiceCode,
+                           latLng,
+                           msg.actualTimestamp,
+                           JourneyDetails(originStationName, activationRec.originDepartureTimestamp))
+          }).value)
 
     private def persistToCache: Sink[IO, TrainActivationMessage] = _.evalMap(msg => cache.put(msg.trainId, msg)(None))
 

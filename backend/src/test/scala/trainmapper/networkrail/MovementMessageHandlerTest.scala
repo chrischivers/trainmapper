@@ -1,53 +1,15 @@
 package trainmapper.networkrail
 
-import akka.util.ByteString
-import cats.effect.IO
-import cats.syntax.functor._
-import fs2.Scheduler
-import fs2.async.Ref
-import fs2.async.mutable.Queue
+import io.circe.parser._
 import org.scalatest.FlatSpec
+import org.scalatest.Matchers._
 import stompa.Message
 import trainmapper.Shared._
+import trainmapper.TestFixture
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import io.circe.parser._
-import org.scalatest.Matchers._
-import trainmapper.StubRedisClient
-import trainmapper.cache.RedisCache
+class MovementMessageHandlerTest extends FlatSpec with TestFixture {
 
-class MovementMessageHandlerTest extends FlatSpec {
-
-  "Movement message handler" should "decode stomp movement message and turn into movement message" in {
-
-    val expectedTrainId         = TrainId("1234567")
-    val expectedServiceCode     = ServiceCode("ABC1234")
-    val expectedActualTimestamp = System.currentTimeMillis()
-    val incomingMessage =
-      Message(Map.empty, movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp).noSpaces)
-
-    //TODO put this into a withApp...
-    (for {
-      ref                    <- Ref[IO, Map[String, ByteString]](Map.empty)
-      activationCache        <- IO(RedisCache(StubRedisClient(ref)))
-      inboundMessageQueue    <- fs2.async.mutable.Queue.unbounded[IO, Message]
-      outboundMessageQueue   <- fs2.async.mutable.Queue.unbounded[IO, MovementPacket]
-      movementMessageHandler <- IO(MovementMessageHandler(activationCache))
-      _                      <- inboundMessageQueue.enqueue1(incomingMessage)
-      _                      <- runHandler(movementMessageHandler, inboundMessageQueue, outboundMessageQueue)
-      message                <- outboundMessageQueue.dequeue1
-    } yield {
-      message shouldBe
-        MovementPacket(expectedTrainId,
-                       expectedServiceCode,
-                       LatLng(53.372653341299724, -3.0108117652815505),
-                       expectedActualTimestamp)
-    }).unsafeRunSync()
-
-  }
-
-  it should "decode stomp activation message and persist to cache" in {
+  "Movement message handler" should "decode stomp activation message and persist to cache" in {
 
     val expectedTrainId                  = TrainId("1234567")
     val expectedScheduleTrainId          = ScheduleTrainId("SJDGD73")
@@ -64,43 +26,87 @@ class MovementMessageHandlerTest extends FlatSpec {
                               expectedOriginDepartureTimestamp).noSpaces
       )
 
-    (for {
-      ref                    <- Ref[IO, Map[String, ByteString]](Map.empty)
-      scheduler              <- Scheduler.allocate[IO](1).map(_._1)
-      activationCache        <- IO(RedisCache(StubRedisClient(ref)))
-      inboundMessageQueue    <- fs2.async.mutable.Queue.unbounded[IO, Message]
-      outboundMessageQueue   <- fs2.async.mutable.Queue.unbounded[IO, MovementPacket]
-      movementMessageHandler <- IO(MovementMessageHandler(activationCache))
-      _                      <- inboundMessageQueue.enqueue1(incomingMessage)
-      _                      <- runHandler(movementMessageHandler, inboundMessageQueue, outboundMessageQueue)
-      maybeMessage           <- outboundMessageQueue.timedDequeue1(1.second, scheduler)
-    } yield {
-      maybeMessage shouldBe None
-      activationCache.get(expectedTrainId).unsafeRunSync() shouldBe Some(
-        TrainActivationMessage(expectedScheduleTrainId,
-                               expectedServiceCode,
-                               expectedTrainId,
-                               expectedOriginStanox,
-                               expectedOriginDepartureTimestamp))
+    withApp() { app =>
+      for {
+        _                      <- app.sendIncomingMessage(incomingMessage)
+        _                      <- app.runMessageHandler()
+        outboundMessages       <- app.getOutboundMessages
+        activationMsgFromCache <- app.redisCache.get(expectedTrainId)
+      } yield {
+        outboundMessages shouldBe empty
+        activationMsgFromCache should ===(
+          Some(
+            TrainActivationMessage(expectedScheduleTrainId,
+                                   expectedServiceCode,
+                                   expectedTrainId,
+                                   expectedOriginStanox,
+                                   expectedOriginDepartureTimestamp)))
 
-    }).unsafeRunSync()
-
+      }
+    }
   }
 
-  private def runHandler(movementMessageHandler: MovementMessageHandler,
-                         inboundQueue: Queue[IO, Message],
-                         outboundQueue: Queue[IO, MovementPacket]) =
-    IO(
-      movementMessageHandler
-        .handleIncomingMessages(inboundQueue, outboundQueue)
-        .compile
-        .drain
-        .unsafeRunTimed(1.second)).void
+  it should "decode stomp movement message and turn into movement packet (where activation record exists)" in {
 
-  def movementMessageJson(trainId: TrainId = TrainId("382Y351718"),
-                          serviceCode: ServiceCode = ServiceCode("22306003"),
-                          actualTimestamp: Long = System.currentTimeMillis(),
-                          locStanox: StanoxCode = StanoxCode("38201")) = {
+    val expectedTrainId         = TrainId("1234567")
+    val expectedServiceCode     = ServiceCode("ABC1234")
+    val expectedActualTimestamp = System.currentTimeMillis()
+    val expectedOriginStanox    = StanoxCode("87722")
+    val expectedOriginDeparture = expectedActualTimestamp - 3600000 //TODO use default values?
+
+    val incomingMessage =
+      Message(Map.empty, movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp).noSpaces)
+    val activationMessages = List(
+      TrainActivationMessage(ScheduleTrainId("AAAAA"),
+                             expectedServiceCode,
+                             expectedTrainId,
+                             expectedOriginStanox,
+                             expectedOriginDeparture))
+
+    withApp(activationMessages) { app =>
+      for {
+        _       <- app.sendIncomingMessage(incomingMessage)
+        _       <- app.runMessageHandler()
+        message <- app.getNextOutboundMessage
+      } yield {
+        message should ===(
+          MovementPacket(
+            expectedTrainId,
+            expectedServiceCode,
+            LatLng(53.372653341299724, -3.0108117652815505),
+            expectedActualTimestamp,
+            JourneyDetails("Redhill Rail Station", expectedOriginDeparture)
+          ))
+      }
+    }
+  }
+
+  it should "decode stomp movement message and NOT turn into movement packet (where activation record does not exist)" in {
+
+    val expectedTrainId         = TrainId("1234567")
+    val expectedServiceCode     = ServiceCode("ABC1234")
+    val expectedActualTimestamp = System.currentTimeMillis()
+    val expectedOriginStanox    = StanoxCode("87722")
+    val expectedOriginDeparture = expectedActualTimestamp - 3600000 //TODO use default values?
+
+    val incomingMessage =
+      Message(Map.empty, movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp).noSpaces)
+
+    withApp() { app =>
+      for {
+        _        <- app.sendIncomingMessage(incomingMessage)
+        _        <- app.runMessageHandler()
+        messages <- app.getOutboundMessages
+      } yield {
+        messages shouldBe empty
+      }
+    }
+  }
+
+  private def movementMessageJson(trainId: TrainId = TrainId("382Y351718"),
+                                  serviceCode: ServiceCode = ServiceCode("22306003"),
+                                  actualTimestamp: Long = System.currentTimeMillis(),
+                                  locStanox: StanoxCode = StanoxCode("38201")) = {
     val str =
       s"""
          |[

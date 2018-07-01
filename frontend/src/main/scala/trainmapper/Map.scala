@@ -48,8 +48,6 @@ object Map {
                 ))
               activeTrains.update(packet.trainId, marker)
           }
-
       }
-
   }
 }

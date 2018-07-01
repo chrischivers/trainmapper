@@ -116,14 +116,18 @@ object Shared {
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
   }
 
-//  case class JourneyDetails(originStationName: String)
-//
-//  object JourneyDetails {
-//    implicit val encoder: Encoder[JourneyDetails] = deriveEncoder[JourneyDetails]
-//    implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
-//  }
+  case class JourneyDetails(originStationName: String, originDepartureTimestamp: Long)
 
-  case class MovementPacket(trainId: TrainId, serviceCode: ServiceCode, latLng: LatLng, actualTimeStamp: Long)
+  object JourneyDetails {
+    implicit val encoder: Encoder[JourneyDetails] = deriveEncoder[JourneyDetails]
+    implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
+  }
+
+  case class MovementPacket(trainId: TrainId,
+                            serviceCode: ServiceCode,
+                            latLng: LatLng,
+                            actualTimeStamp: Long,
+                            journeyDetails: JourneyDetails)
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]

@@ -1,7 +1,9 @@
 package trainmapper
 
+import akka.actor.ActorSystem
 import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
+import redis.RedisClient
 import stompa.fs2.Fs2MessageHandler
 import stompa.{Message, StompClient}
 import trainmapper.Shared.MovementPacket
@@ -15,6 +17,8 @@ object Main extends App with StrictLogging {
 
   import stompa.support.IOSupport._
 
+  implicit val actorSystem = ActorSystem()
+
   val config = Config()
 
   val app = for {
@@ -24,7 +28,8 @@ object Main extends App with StrictLogging {
     networkRailClient    <- IO(NetworkRailClient())
     stompClient          <- IO(StompClient[IO](config.stompConfig))
     _                    <- networkRailClient.subscribeToTopic(config.movementTopic, stompClient, stompHandler)
-    activationCache      <- IO(RedisCache(???))
+    redisClient          <- IO(RedisClient())
+    activationCache      <- IO(RedisCache(redisClient))
     _ <- MovementMessageHandler(activationCache)
       .handleIncomingMessages(inboundMessageQueue, outboundMessageQueue)
       .concurrently { ServerWithWebsockets(outboundMessageQueue, config.googleMapsApiKey).stream(List.empty, IO.unit) }

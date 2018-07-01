@@ -38,18 +38,21 @@ object Reference extends StrictLogging {
 
   def latLngFor(stanox: StanoxCode): Option[LatLng] =
     for {
-      data <- corpusData.toOption
-//      _ = println("data: "  + data)
-      tipLocCode <- data.find(_.stanox == stanox).map(_.tiploc)
-//      _ = println("tiploccode: " + tipLocCode)
-      recordMap <- railReferences.find(_.get("TiplocCode").contains(tipLocCode.value))
-//      _ = println("record map: " + recordMap)
-      easting  <- recordMap.get("Easting").flatMap(safeToDouble)
-      northing <- recordMap.get("Northing").flatMap(safeToDouble)
-//      _ = println("easting and northing: " + easting + ", " + northing)
-      latLng <- latLngFromEastingNorthing(easting, northing)
-//      _ = println("latlng: " + latLng)
+      recordMap <- recordMapFor(stanox)
+      easting   <- recordMap.get("Easting").flatMap(safeToDouble)
+      northing  <- recordMap.get("Northing").flatMap(safeToDouble)
+      latLng    <- latLngFromEastingNorthing(easting, northing)
     } yield latLng
+
+  def stationNameFor(stanox: StanoxCode) =
+    recordMapFor(stanox).flatMap(_.get("StationName"))
+
+  private def recordMapFor(stanox: StanoxCode) =
+    for {
+      data       <- corpusData.toOption
+      tipLocCode <- data.find(_.stanox == stanox).map(_.tiploc)
+      recordMap  <- railReferences.find(_.get("TiplocCode").contains(tipLocCode.value))
+    } yield recordMap
 
   private def safeToDouble(str: String) = Try(str.toDouble).toOption
 

@@ -1,9 +1,16 @@
 package trainmapper
 
+import java.time.LocalTime
+
 import doobie.util.meta.Meta
 import io.circe.{Decoder, Encoder, Json}
+import io.circe.java8.time.decodeLocalTime
+import trainmapper.schedule.ScheduleTable.timeFormatter
 
 package object schedule {
+
+  implicit final val localTimeDecoder: Decoder[LocalTime] =
+    decodeLocalTime(timeFormatter)
 
   sealed trait LocationType {
     val string: String

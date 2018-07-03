@@ -5,7 +5,7 @@ import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
 import redis.RedisClient
 import stompa.fs2.Fs2MessageHandler
-import stompa.{Message, StompClient}
+import stompa.{Message, StompClient, StompConfig}
 import trainmapper.Shared.MovementPacket
 import trainmapper.cache.RedisCache
 import trainmapper.server.ServerWithWebsockets
@@ -26,10 +26,15 @@ object Main extends App with StrictLogging {
     outboundMessageQueue <- fs2.async.mutable.Queue.unbounded[IO, MovementPacket]
     stompHandler         <- IO(Fs2MessageHandler[IO](inboundMessageQueue))
     networkRailClient    <- IO(NetworkRailClient())
-    stompClient          <- IO(StompClient[IO](config.stompConfig))
-    _                    <- networkRailClient.subscribeToTopic(config.movementTopic, stompClient, stompHandler)
-    redisClient          <- IO(RedisClient())
-    activationCache      <- IO(RedisCache(redisClient))
+    stompConfig <- IO(
+      StompConfig(config.networkRailConfig.stompUrl.renderString,
+                  config.networkRailConfig.stompPort,
+                  config.networkRailConfig.username,
+                  config.networkRailConfig.password))
+    stompClient     <- IO(StompClient[IO](stompConfig))
+    _               <- networkRailClient.subscribeToTopic(config.networkRailConfig.movementTopic, stompClient, stompHandler)
+    redisClient     <- IO(RedisClient())
+    activationCache <- IO(RedisCache(redisClient))
     _ <- MovementMessageHandler(activationCache)
       .handleIncomingMessages(inboundMessageQueue, outboundMessageQueue)
       .concurrently { ServerWithWebsockets(outboundMessageQueue, config.googleMapsApiKey).stream(List.empty, IO.unit) }

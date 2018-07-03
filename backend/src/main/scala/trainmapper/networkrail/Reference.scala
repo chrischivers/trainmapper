@@ -47,6 +47,12 @@ object Reference extends StrictLogging {
   def stationNameFor(stanox: StanoxCode) =
     recordMapFor(stanox).flatMap(_.get("StationName"))
 
+  def stanoxFor(tipLocCode: TipLocCode): Option[StanoxCode] =
+    for {
+      data   <- corpusData.toOption
+      stanox <- data.find(_.tiploc == tipLocCode).map(_.stanox)
+    } yield stanox
+
   private def recordMapFor(stanox: StanoxCode) =
     for {
       data       <- corpusData.toOption

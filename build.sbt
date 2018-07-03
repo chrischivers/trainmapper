@@ -4,7 +4,7 @@ import sbtcrossproject.CrossType
 
 val stompaVersion = "0.1.0-SNAPSHOT"
 val scalaLoggingVersion = "3.5.0"
-val circeVersion = "0.9.3"
+val circeVersion = "0.9.0"
 val http4sVersion = "0.18.12"
 val doobieVersion  = "0.5.3"
 val scalaJsDomV = "0.9.6"
@@ -61,7 +61,8 @@ lazy val backend = (project in file("backend"))
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "com.github.etaty" %% "rediscala" % "1.8.0",
-      "org.flywaydb" % "flyway-core" % "5.1.1")
+      "org.flywaydb" % "flyway-core" % "5.1.1",
+      "io.circe" %% "circe-fs2" % circeVersion)
       ++ Seq(
       "org.tpolecat"               %% "doobie-core"             % doobieVersion,
       "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
@@ -72,7 +73,8 @@ lazy val backend = (project in file("backend"))
       ++ Seq(
         "org.http4s"     %% "http4s-circe",
         "org.http4s"     %% "http4s-blaze-server",
-        "org.http4s"     %% "http4s-dsl"
+        "org.http4s"     %% "http4s-dsl",
+      "org.http4s" %% "http4s-blaze-client"
       ).map(_ % http4sVersion),
     resources in Compile += (fastOptJS in (frontend, Compile)).value.data,
     resources in Compile += (fastOptJS in (frontend, Compile)).value

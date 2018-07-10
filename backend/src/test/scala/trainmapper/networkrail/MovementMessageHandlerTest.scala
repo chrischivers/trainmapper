@@ -1,5 +1,6 @@
 package trainmapper.networkrail
 
+import io.circe.Json
 import io.circe.parser._
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers._
@@ -19,11 +20,14 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
     val incomingMessage =
       Message(
         Map.empty,
-        activationMessageJson(expectedTrainId,
-                              expectedScheduleTrainId,
-                              expectedServiceCode,
-                              expectedOriginStanox,
-                              expectedOriginDepartureTimestamp).noSpaces
+        Json
+          .arr(
+            activationMessageJson(expectedTrainId,
+                                  expectedScheduleTrainId,
+                                  expectedServiceCode,
+                                  expectedOriginStanox,
+                                  expectedOriginDepartureTimestamp))
+          .noSpaces
       )
 
     withApp() { app =>
@@ -49,15 +53,17 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
   it should "decode stomp movement message and turn into movement packet (where activation record exists)" in {
 
     val expectedTrainId         = TrainId("1234567")
+    val expectedScheduleTrainId = ScheduleTrainId("AAAAA")
     val expectedServiceCode     = ServiceCode("ABC1234")
     val expectedActualTimestamp = System.currentTimeMillis()
     val expectedOriginStanox    = StanoxCode("87722")
     val expectedOriginDeparture = expectedActualTimestamp - 3600000 //TODO use default values?
 
     val incomingMessage =
-      Message(Map.empty, movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp).noSpaces)
+      Message(Map.empty,
+              Json.arr(movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp)).noSpaces)
     val activationMessages = List(
-      TrainActivationMessage(ScheduleTrainId("AAAAA"),
+      TrainActivationMessage(expectedScheduleTrainId,
                              expectedServiceCode,
                              expectedTrainId,
                              expectedOriginStanox,
@@ -72,10 +78,12 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
         message should ===(
           MovementPacket(
             expectedTrainId,
+            expectedScheduleTrainId,
             expectedServiceCode,
             LatLng(53.372653341299724, -3.0108117652815505),
             expectedActualTimestamp,
-            JourneyDetails("Redhill Rail Station", expectedOriginDeparture)
+            JourneyDetails("Redhill Rail Station", expectedOriginDeparture),
+            List.empty
           ))
       }
     }
@@ -86,11 +94,10 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
     val expectedTrainId         = TrainId("1234567")
     val expectedServiceCode     = ServiceCode("ABC1234")
     val expectedActualTimestamp = System.currentTimeMillis()
-    val expectedOriginStanox    = StanoxCode("87722")
-    val expectedOriginDeparture = expectedActualTimestamp - 3600000 //TODO use default values?
 
     val incomingMessage =
-      Message(Map.empty, movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp).noSpaces)
+      Message(Map.empty,
+              Json.arr(movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp)).noSpaces)
 
     withApp() { app =>
       for {
@@ -103,13 +110,65 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
     }
   }
 
+  it should "decode an array of an activation message and movement message and persist to cache" in {
+
+    val expectedTrainId                  = TrainId("1234567")
+    val expectedScheduleTrainId          = ScheduleTrainId("SJDGD73")
+    val expectedServiceCode              = ServiceCode("ABC1234")
+    val expectedOriginStanox             = StanoxCode("87722")
+    val expectedOriginDepartureTimestamp = System.currentTimeMillis()
+    val expectedActualTimestamp          = System.currentTimeMillis()
+
+    val incomingMessage =
+      Message(
+        Map.empty,
+        Json
+          .arr(
+            activationMessageJson(expectedTrainId,
+                                  expectedScheduleTrainId,
+                                  expectedServiceCode,
+                                  expectedOriginStanox,
+                                  expectedOriginDepartureTimestamp),
+            movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp)
+          )
+          .noSpaces
+      )
+
+    withApp() { app =>
+      for {
+        _                      <- app.sendIncomingMessage(incomingMessage)
+        _                      <- app.runMessageHandler()
+        activationMsgFromCache <- app.redisCache.get(expectedTrainId)
+        movementMessage        <- app.getNextOutboundMessage
+      } yield {
+        activationMsgFromCache should ===(
+          Some(
+            TrainActivationMessage(expectedScheduleTrainId,
+                                   expectedServiceCode,
+                                   expectedTrainId,
+                                   expectedOriginStanox,
+                                   expectedOriginDepartureTimestamp)))
+        movementMessage should ===(
+          MovementPacket(
+            expectedTrainId,
+            expectedScheduleTrainId,
+            expectedServiceCode,
+            LatLng(53.372653341299724, -3.0108117652815505),
+            expectedActualTimestamp,
+            JourneyDetails("Redhill Rail Station", expectedOriginDepartureTimestamp),
+            List.empty
+          ))
+
+      }
+    }
+  }
+
   private def movementMessageJson(trainId: TrainId = TrainId("382Y351718"),
                                   serviceCode: ServiceCode = ServiceCode("22306003"),
                                   actualTimestamp: Long = System.currentTimeMillis(),
                                   locStanox: StanoxCode = StanoxCode("38201")) = {
     val str =
       s"""
-         |[
          |   {
          |      "header":{
          |         "msg_type":"0003",
@@ -151,7 +210,6 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
          |         "line_ind":""
          |      }
          |   }
-         | ]
     """.stripMargin
     parse(str).right.get
   }
@@ -163,7 +221,6 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
                             originDepartureTimestamp: Long = System.currentTimeMillis()) = {
     val str =
       s"""
-         |[
          |   {
          |      "header":{
          |         "msg_type":"0001",
@@ -194,7 +251,6 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
          |         "schedule_start_date":"2018-01-14"
          |      }
          |   }
-         |]
        """.stripMargin
     parse(str).right.get
   }

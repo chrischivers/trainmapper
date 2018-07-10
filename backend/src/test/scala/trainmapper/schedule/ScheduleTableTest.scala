@@ -1,10 +1,11 @@
 package trainmapper.schedule
 
 import java.time.{LocalDate, LocalTime}
-import trainmapper.TestFixture
+
+import trainmapper.{Shared, TestFixture}
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers._
-import trainmapper.Shared.{ScheduleTrainId, ServiceCode, StanoxCode, TipLocCode}
+import trainmapper.Shared._
 import trainmapper.schedule.ScheduleTable.ScheduleRecord
 
 class ScheduleTableTest extends FlatSpec with TestFixture {
@@ -19,8 +20,9 @@ class ScheduleTableTest extends FlatSpec with TestFixture {
         TipLocCode("33333"),
         Some(StanoxCode("44444")),
         LocationType.OriginatingLocation,
-        Some(LocalTime.parse("0649", ScheduleTable.timeFormatter)),
-        Some(LocalTime.parse("0651", ScheduleTable.timeFormatter)),
+        Some(LocalTime.parse("0649", Shared.timeFormatter)),
+        Some(LocalTime.parse("0651", Shared.timeFormatter)),
+        DaysRun("1111100"),
         LocalDate.now(),
         LocalDate.now().plusDays(5)
       )

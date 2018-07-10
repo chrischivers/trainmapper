@@ -20,8 +20,6 @@ trait ScheduleTable extends Table[ScheduleRecord] {
 
 object ScheduleTable {
 
-  val timeFormatter = DateTimeFormatter.ofPattern("HHmm")
-
   case class ScheduleRecord(id: Option[Int],
                             scheduleTrainId: ScheduleTrainId,
                             sequence: Int,
@@ -31,8 +29,18 @@ object ScheduleTable {
                             locationType: LocationType,
                             scheduledArrivalTime: Option[LocalTime],
                             scheduledDepartureTime: Option[LocalTime],
+                            daysRun: DaysRun,
                             scheduleStart: LocalDate,
-                            scheduleEnd: LocalDate)
+                            scheduleEnd: LocalDate) {
+    def toScheduleDetailsRecord =
+      ScheduleDetailRecord(this.sequence,
+                           this.tipLocCode,
+                           this.stanoxCode,
+                           this.locationType,
+                           this.scheduledArrivalTime,
+                           this.scheduledDepartureTime,
+                           this.daysRun)
+  }
 
   object ScheduleRecord {
 
@@ -57,15 +65,15 @@ object ScheduleTable {
     override protected def insertRecord(record: ScheduleRecord): IO[Unit] =
       sql"""
       INSERT INTO schedule
-      (schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, schedule_start, schedule_end)
-      VALUES(${record.scheduleTrainId}, ${record.sequence}, ${record.serviceCode}, ${record.tipLocCode}, ${record.stanoxCode}, ${record.locationType}, ${record.scheduledArrivalTime}, ${record.scheduledDepartureTime}, ${record.scheduleStart}, ${record.scheduleEnd})
+      (schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, days_run, schedule_start, schedule_end)
+      VALUES(${record.scheduleTrainId}, ${record.sequence}, ${record.serviceCode}, ${record.tipLocCode}, ${record.stanoxCode}, ${record.locationType}, ${record.scheduledArrivalTime}, ${record.scheduledDepartureTime}, ${record.daysRun}, ${record.scheduleStart}, ${record.scheduleEnd})
      """.update.run
         .transact(db)
         .void
 
     override def scheduleFor(scheduleTrainId: ScheduleTrainId): IO[List[ScheduleRecord]] =
       sql"""
-      SELECT id, schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, schedule_start, schedule_end
+      SELECT id, schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, days_run, schedule_start, schedule_end
       FROM schedule
       """
         .query[ScheduleRecord]
@@ -74,7 +82,7 @@ object ScheduleTable {
 
     override def allRecords: IO[List[ScheduleRecord]] =
       sql"""
-      SELECT id, schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, schedule_start, schedule_end
+      SELECT id, schedule_train_id, sequence, service_code, tiploc_code, stanox_code, location_type, scheduled_arrival_time, scheduled_departure_time, days_run, schedule_start, schedule_end
       FROM schedule
       """
         .query[ScheduleRecord]

@@ -6,7 +6,15 @@ import stompa.{StompConfig, Topic}
 
 object Config {
 
-  case class TrainMapperConfig(googleMapsApiKey: String, networkRailConfig: NetworkRailConfig)
+  case class TrainMapperConfig(googleMapsApiKey: String,
+                               networkRailConfig: NetworkRailConfig,
+                               databaseConfig: DatabaseConfig)
+
+  case class DatabaseConfig(driverClassName: String,
+                            url: String,
+                            username: String,
+                            password: String,
+                            maximumPoolSize: Int = 2)
 
   case class NetworkRailConfig(username: String,
                                password: String,
@@ -23,8 +31,15 @@ object Config {
         config.getString("networkRail.password"),
         Uri.unsafeFromString(config.getString("networkRail.host")),
         config.getInt("networkRail.port"),
-        Topic(config.getString("movement-topic")),
-        Uri.unsafeFromString(config.getString("schedule-url")),
+        Topic(config.getString("networkRail.movement-topic")),
+        Uri.unsafeFromString(config.getString("networkRail.schedule-url")),
+      ),
+      databaseConfig = DatabaseConfig(
+        config.getString("db.driverClassName"),
+        config.getString("db.url"),
+        config.getString("db.username"),
+        config.getString("db.password"),
+        config.getInt("db.maximumPoolSize")
       )
     )
 

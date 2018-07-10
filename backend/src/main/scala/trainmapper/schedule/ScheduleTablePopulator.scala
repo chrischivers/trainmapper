@@ -5,21 +5,21 @@ import java.time.{LocalDate, LocalTime}
 
 import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
+import fs2.compress._
 import fs2.{Pipe, Stream}
-import fs2.compress.inflate
 import io.circe.Decoder.Result
-import io.circe.{Decoder, DecodingFailure, HCursor, Json}
-import trainmapper.schedule.ScheduleTable.ScheduleRecord
 import io.circe.fs2._
+import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.http4s.client.Client
 import org.http4s.client.middleware.FollowRedirect
 import org.http4s.headers.Authorization
-import org.http4s.{BasicCredentials, EntityBody, Headers, Request, Uri}
+import org.http4s.{BasicCredentials, EntityBody, Headers, Request}
 import trainmapper.Config.NetworkRailConfig
-import trainmapper.Shared.{ScheduleTrainId, ServiceCode, TipLocCode}
+import trainmapper.Shared.{DaysRun, LocationType, ScheduleTrainId, ServiceCode, TipLocCode}
 import trainmapper.networkrail.Reference
-import trainmapper.schedule.ScheduleTablePopulator.DecodedScheduleRecord.ScheduleSegment.ScheduleLocation
+import trainmapper.schedule.ScheduleTable.ScheduleRecord
 import trainmapper.schedule.ScheduleTablePopulator.DecodedScheduleRecord.ScheduleSegment
+import trainmapper.schedule.ScheduleTablePopulator.DecodedScheduleRecord.ScheduleSegment.ScheduleLocation
 
 trait ScheduleTablePopulator {
 
@@ -27,6 +27,8 @@ trait ScheduleTablePopulator {
 }
 
 object ScheduleTablePopulator extends StrictLogging {
+
+  import trainmapper.Shared.localTimeDecoder
 
   val tmpDownloadLocation = Paths.get("/tmp/schedule-data-downloaded.gz")
   val tmpUnzipLocation    = Paths.get("/tmp/schedule-data-unzipped.dat")
@@ -47,6 +49,7 @@ object ScheduleTablePopulator extends StrictLogging {
   }
 
   case class DecodedScheduleRecord(CIF_train_uid: ScheduleTrainId,
+                                   schedule_days_runs: DaysRun,
                                    schedule_start_date: LocalDate,
                                    schedule_end_date: LocalDate,
                                    schedule_segment: ScheduleSegment)
@@ -64,6 +67,7 @@ object ScheduleTablePopulator extends StrictLogging {
           loc.location_type,
           loc.public_arrival,
           loc.public_departure,
+          schedule_days_runs,
           schedule_start_date,
           schedule_end_date
         )
@@ -119,8 +123,14 @@ object ScheduleTablePopulator extends StrictLogging {
           .withHeaders(Headers(Authorization(credentials)))
         _ <- FollowRedirect(maxRedirects = 10)(client)
           .streaming(request) { resp =>
-            logger.info("Response successful. Writing to file...")
-            fs2.Stream.eval(writeToFile(tmpDownloadLocation, resp.body))
+            println("Response status: " + resp.status)
+            if (resp.status.isSuccess) {
+              logger.info("Download of schedule response successful. Writing to file...")
+              fs2.Stream.eval(writeToFile(tmpDownloadLocation, resp.body))
+            } else {
+              fs2.Stream.eval(
+                IO(logger.error(s"Download of schedule response unsuccessful ${resp.status}. Not downloading")))
+            }
           }
           .compile
           .drain

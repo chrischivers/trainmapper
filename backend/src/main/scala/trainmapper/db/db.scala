@@ -6,16 +6,11 @@ import doobie.hikari.HikariTransactor
 import fs2.Stream
 import org.flywaydb.core.Flyway
 import doobie.hikari.implicits._
+import trainmapper.Config.DatabaseConfig
 
 package object db {
 
   private val migrationLocation = "db/migration"
-
-  case class DatabaseConfig(driverClassName: String,
-                            url: String,
-                            username: String,
-                            password: String,
-                            maximumPoolSize: Int = 2)
 
   def setUpTransactor(config: DatabaseConfig)(beforeMigration: Flyway => Unit = _ => ()) =
     for {
@@ -23,6 +18,7 @@ package object db {
         .newHikariTransactor[IO](config.driverClassName, config.url, config.username, config.password)
       _ <- transactor.configure { datasource =>
         IO {
+          datasource.setMaximumPoolSize(config.maximumPoolSize)
           val flyway = new Flyway()
           flyway.setDataSource(datasource)
           flyway.setLocations(migrationLocation)

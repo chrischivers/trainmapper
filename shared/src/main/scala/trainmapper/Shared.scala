@@ -1,9 +1,23 @@
 package trainmapper
 
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto._
 
 object Shared {
+
+  import io.circe.java8.time.decodeLocalTime
+  import io.circe.java8.time.encodeLocalTime
+
+  val timeFormatter = DateTimeFormatter.ofPattern("HHmm")
+
+  implicit final val localTimeDecoder: Decoder[LocalTime] =
+    decodeLocalTime(timeFormatter)
+
+  implicit final val localTimeEncoder: Encoder[LocalTime] =
+    encodeLocalTime(timeFormatter)
 
   case class TrainId(value: String)
 
@@ -71,6 +85,14 @@ object Shared {
     implicit val encoder: Encoder[TipLocCode] = Encoder[TipLocCode](a => Json.fromString(a.value))
   }
 
+  case class DaysRun(value: String)
+
+  object DaysRun {
+
+    implicit val decoder: Decoder[DaysRun] = Decoder.decodeString.map(DaysRun(_))
+    implicit val encoder: Encoder[DaysRun] = Encoder[DaysRun](a => Json.fromString(a.value))
+  }
+
   sealed trait VariationStatus {
     val string: String
     val notifiable: Boolean
@@ -109,6 +131,32 @@ object Shared {
     implicit val decoder: Decoder[VariationStatus] = Decoder.decodeString.map(fromString)
   }
 
+  sealed trait LocationType {
+    val string: String
+  }
+
+  object LocationType {
+
+    case object OriginatingLocation extends LocationType {
+      override val string: String = "LO"
+    }
+    case object TerminatingLocation extends LocationType {
+      override val string: String = "LT"
+    }
+    case object IntermediateLocation extends LocationType {
+      override val string: String = "LI"
+    }
+
+    def fromString(str: String): LocationType =
+      str match {
+        case OriginatingLocation.string  => OriginatingLocation
+        case TerminatingLocation.string  => TerminatingLocation
+        case IntermediateLocation.string => IntermediateLocation
+      }
+    implicit val decoder: Decoder[LocationType] = Decoder.decodeString.map(fromString)
+    implicit val encoder: Encoder[LocationType] = (a: LocationType) => Json.fromString(a.string)
+  }
+
   case class LatLng(lat: Double, lng: Double)
 
   object LatLng {
@@ -123,11 +171,26 @@ object Shared {
     implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
   }
 
+  case class ScheduleDetailRecord(sequence: Int,
+                                  tipLocCode: TipLocCode,
+                                  stanoxCode: Option[StanoxCode],
+                                  locationType: LocationType,
+                                  scheduledArrivalTime: Option[LocalTime],
+                                  scheduledDepartureTime: Option[LocalTime],
+                                  daysRun: DaysRun)
+
+  object ScheduleDetailRecord {
+    implicit val encoder: Encoder[ScheduleDetailRecord] = deriveEncoder[ScheduleDetailRecord]
+    implicit val decoder: Decoder[ScheduleDetailRecord] = deriveDecoder[ScheduleDetailRecord]
+  }
+
   case class MovementPacket(trainId: TrainId,
+                            scheduleTrainId: ScheduleTrainId,
                             serviceCode: ServiceCode,
                             latLng: LatLng,
                             actualTimeStamp: Long,
-                            journeyDetails: JourneyDetails)
+                            journeyDetails: JourneyDetails,
+                            scheduleDetails: List[ScheduleDetailRecord])
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]

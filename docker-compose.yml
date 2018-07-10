@@ -6,3 +6,10 @@ services:
     hostname: redis
     ports:
           - 6379:6379
+
+  postgres:
+      image: postgres:10.4
+      ports:
+          - 5432:5432
+      environment:
+        POSTGRES_DB: trainmapper

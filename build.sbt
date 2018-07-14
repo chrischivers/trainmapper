@@ -53,10 +53,14 @@ lazy val backendMessageReceiver = (project in file("message-receiver"))
       "io.chiv" %% "stompa-fs2" % stompaVersion,
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
       "com.itv" %% "bucky-core" % buckyVersion,
       "com.itv" %% "bucky-rabbitmq" % buckyVersion,
       "com.itv" %% "bucky-fs2" % buckyVersion,
-      "com.itv" %% "bucky-circe" % buckyVersion),
+      "com.itv" %% "bucky-circe" % buckyVersion,
+      "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
     resources in Compile += (fastOptJS in (frontend, Compile)).value.data,
     resources in Compile += (fastOptJS in (frontend, Compile)).value
       .map((x: sbt.File) => new File(x.getAbsolutePath + ".map"))

@@ -8,6 +8,8 @@ object RabbitConfig {
 
   val trainMovementsExchange = Exchange(ExchangeName("train-movements"), exchangeType = Topic)
 
+  val declarations = List(trainMovementsExchange)
+
   def read = {
     val config = ConfigFactory.load()
     AmqpClientConfig(

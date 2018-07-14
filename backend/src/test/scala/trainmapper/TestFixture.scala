@@ -20,6 +20,7 @@ import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{Cache, RedisCache}
 import trainmapper.networkrail.{MovementMessageHandler, TrainActivationMessage}
 import trainmapper.schedule.ScheduleTable
+import trainmapper.schedule.ScheduleTable.ScheduleRecord
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -55,11 +56,13 @@ trait TestFixture {
 
   }
 
-  def withApp(activationMessages: List[TrainActivationMessage] = List.empty, clock: Clock = Clock.systemUTC())(
-      f: TrainMapperApp => IO[Assertion]) =
+  def withApp(activationMessages: List[TrainActivationMessage] = List.empty,
+              scheduleRecords: List[ScheduleRecord] = List.empty,
+              clock: Clock = Clock.systemUTC())(f: TrainMapperApp => IO[Assertion]) =
     withDatabase(h2DatabaseConfig) { db =>
       (for {
         scheduleTable   <- IO(ScheduleTable(db))
+        _               <- scheduleRecords.traverse[IO, Unit](rec => scheduleTable.safeInsertRecord(rec))
         scheduler       <- Scheduler.allocate[IO](1).map(_._1)
         redisCacheRef   <- Ref[IO, Map[String, ByteString]](Map.empty)
         activationCache <- IO(RedisCache(StubRedisClient(redisCacheRef)))

@@ -1,12 +1,15 @@
 package trainmapper.networkrail
 
+import java.time.{LocalDate, LocalTime}
+
 import io.circe.Json
 import io.circe.parser._
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers._
 import stompa.Message
 import trainmapper.Shared._
-import trainmapper.TestFixture
+import trainmapper.{Shared, TestFixture}
+import trainmapper.schedule.ScheduleTable.ScheduleRecord
 
 class MovementMessageHandlerTest extends FlatSpec with TestFixture {
 
@@ -53,7 +56,7 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
   it should "decode stomp movement message and turn into movement packet (where activation record exists)" in {
 
     val expectedTrainId         = TrainId("1234567")
-    val expectedScheduleTrainId = ScheduleTrainId("AAAAA")
+    val expectedScheduleTrainId = ScheduleTrainId("W60176")
     val expectedServiceCode     = ServiceCode("ABC1234")
     val expectedActualTimestamp = System.currentTimeMillis()
     val expectedOriginStanox    = StanoxCode("87722")
@@ -84,6 +87,62 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
             expectedActualTimestamp,
             JourneyDetails("Redhill Rail Station", expectedOriginDeparture),
             List.empty
+          ))
+      }
+    }
+  }
+
+  it should "include schedule with movement packet" in {
+
+    val expectedTrainId         = TrainId("1234567")
+    val expectedScheduleTrainId = ScheduleTrainId("W60176")
+    val expectedServiceCode     = ServiceCode("ABC1234")
+    val expectedActualTimestamp = System.currentTimeMillis()
+    val expectedOriginStanox    = StanoxCode("87722")
+    val expectedOriginDeparture = expectedActualTimestamp - 3600000 //TODO use default values?
+
+    val incomingMessage =
+      Message(Map.empty,
+              Json.arr(movementMessageJson(expectedTrainId, expectedServiceCode, expectedActualTimestamp)).noSpaces)
+    val activationMessages = List(
+      TrainActivationMessage(expectedScheduleTrainId,
+                             expectedServiceCode,
+                             expectedTrainId,
+                             expectedOriginStanox,
+                             expectedOriginDeparture))
+
+    val scheduleRecord = ScheduleRecord(
+      None,
+      expectedScheduleTrainId,
+      1,
+      expectedServiceCode,
+      TipLocCode("33333"),
+      Some(StanoxCode("44444")),
+      LocationType.OriginatingLocation,
+      Some(LocalTime.parse("0649", Shared.timeFormatter)),
+      Some(LocalTime.parse("0651", Shared.timeFormatter)),
+      DaysRun("1111100"),
+      LocalDate.now(),
+      LocalDate.now().plusDays(5)
+    )
+
+    val expectedSchedule = List(scheduleRecord, scheduleRecord.copy(sequence = 2), scheduleRecord.copy(sequence = 3))
+
+    withApp(activationMessages, expectedSchedule) { app =>
+      for {
+        _       <- app.sendIncomingMessage(incomingMessage)
+        _       <- app.runMessageHandler()
+        message <- app.getNextOutboundMessage
+      } yield {
+        message should ===(
+          MovementPacket(
+            expectedTrainId,
+            expectedScheduleTrainId,
+            expectedServiceCode,
+            LatLng(53.372653341299724, -3.0108117652815505),
+            expectedActualTimestamp,
+            JourneyDetails("Redhill Rail Station", expectedOriginDeparture),
+            expectedSchedule.map(_.toScheduleDetailsRecord)
           ))
       }
     }

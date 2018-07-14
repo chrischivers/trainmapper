@@ -34,7 +34,7 @@ object MovementMessageHandler extends StrictLogging {
               case msg: TrainMovementMessage =>
                 fs2.Stream
                   .eval(IO(msg))
-//                  .filter(_.toc == TOC("88"))
+                  .filter(_.toc == TOC("88"))
                   .observe1(m => IO(logger.info(s"Received message $m")))
                   .through(toMovementPacket)
                   .observe1(m => IO(logger.info(s"Movement packet: $m")))
@@ -51,7 +51,6 @@ object MovementMessageHandler extends StrictLogging {
       private def messagesDecoder: Pipe[IO, Message, Either[Error, List[IncomingMessage]]] =
         (in: fs2.Stream[IO, Message]) => in.map(msg => logOnFailure(decode[List[IncomingMessage]](msg.body)))
 
-      //TODO use validation here
       private def toMovementPacket: Pipe[IO, TrainMovementMessage, Option[MovementPacket]] =
         (in: fs2.Stream[IO, TrainMovementMessage]) =>
           in.evalMap(msg => {

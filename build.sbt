@@ -9,6 +9,7 @@ val http4sVersion = "0.18.12"
 val doobieVersion  = "0.5.3"
 val scalaJsDomV = "0.9.6"
 val scalaTagsV = "0.6.7"
+val buckyVersion = "1.3.1"
 
 /*
 Scala JS setup below based on example provided at:
@@ -40,9 +41,28 @@ lazy val shared =
       )
     )
 
-
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js
+
+lazy val backendMessageReceiver = (project in file("message-receiver"))
+  .settings(
+    name := "trainmapper-message-receiver"
+  ) .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.chiv" %% "stompa-fs2" % stompaVersion,
+      "com.typesafe" % "config" % "1.3.3",
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "com.itv" %% "bucky-core" % buckyVersion,
+      "com.itv" %% "bucky-rabbitmq" % buckyVersion,
+      "com.itv" %% "bucky-fs2" % buckyVersion,
+      "com.itv" %% "bucky-circe" % buckyVersion),
+    resources in Compile += (fastOptJS in (frontend, Compile)).value.data,
+    resources in Compile += (fastOptJS in (frontend, Compile)).value
+      .map((x: sbt.File) => new File(x.getAbsolutePath + ".map"))
+      .data,
+    (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
+  ).dependsOn(sharedJvm)
 
 
 lazy val backend = (project in file("backend"))

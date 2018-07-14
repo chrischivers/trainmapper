@@ -72,17 +72,17 @@ package object networkrail {
       }
     }
 
-    implicit val incomingMessageDecoder: Decoder[IncomingMessage] = (c: HCursor) =>
-      for {
-        messageType <- c.downField("header").downField("msg_type").as[String]
-        decoded <- messageType match {
-          case "0001" => c.as[TrainActivationMessage](trainActivationIncomingDecoder)
-          //          case "0002"  => c.as[TrainCancellationRecord](TrainCancellationRecord.trainCancellationDecoder)
-          case "0003" => c.as[TrainMovementMessage](trainMovementIncomingDecoder)
-          //          case "0006"  => c.as[TrainChangeOfOriginRecord](TrainChangeOfOriginRecord.trainChangeOfOriginDecoder)
-          case unknown => Right(UnhandledTrainMessage(unknown))
-        }
-      } yield decoded
+//    implicit val incomingMessageDecoder: Decoder[IncomingMessage] = (c: HCursor) =>
+//      for {
+//        messageType <- c.downField("header").downField("msg_type").as[String]
+//        decoded <- messageType match {
+//          case "0001" => c.as[TrainActivationMessage](trainActivationIncomingDecoder)
+//          //          case "0002"  => c.as[TrainCancellationRecord](TrainCancellationRecord.trainCancellationDecoder)
+//          case "0003" => c.as[TrainMovementMessage](trainMovementIncomingDecoder)
+//          //          case "0006"  => c.as[TrainChangeOfOriginRecord](TrainChangeOfOriginRecord.trainChangeOfOriginDecoder)
+//          case unknown => Right(UnhandledTrainMessage(unknown))
+//        }
+//      } yield decoded
   }
 
   case class UnhandledTrainMessage(unhandledType: String) extends IncomingMessage

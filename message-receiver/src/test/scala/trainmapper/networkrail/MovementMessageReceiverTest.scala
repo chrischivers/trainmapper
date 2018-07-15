@@ -41,7 +41,7 @@ class MovementMessageReceiverTest extends FlatSpec {
     for {
       inboundMessageQueue <- fs2.Stream.eval(fs2.async.mutable.Queue.unbounded[IO, Message])
       rabbitClient        <- fs2.Stream.eval(IO(rabbitSimulator))
-      _                   <- fs2.Stream.eval(IO(DeclarationExecutor(List(RabbitConfig.trainMovementsExchange), rabbitClient)))
+      _                   <- fs2.Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitClient)))
       consumer1           <- rabbitClient.consume(RabbitConfig.trainMovementsExchange.name, RoutingKey(messageType1))
       consumer2           <- rabbitClient.consume(RabbitConfig.trainMovementsExchange.name, RoutingKey(messageType2))
       messageReceiver     <- fs2.Stream.eval(IO(MovementMessageReceiver(rabbitClient.publisher())))

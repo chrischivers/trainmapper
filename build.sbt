@@ -61,12 +61,27 @@ lazy val backendMessageReceiver = (project in file("message-receiver"))
       "com.itv" %% "bucky-fs2" % buckyVersion,
       "com.itv" %% "bucky-circe" % buckyVersion,
       "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
-    resources in Compile += (fastOptJS in (frontend, Compile)).value.data,
-    resources in Compile += (fastOptJS in (frontend, Compile)).value
-      .map((x: sbt.File) => new File(x.getAbsolutePath + ".map"))
-      .data,
-    (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
     mainClass in (Compile, run) := Some("trainmapper.MessageReceiverMain")
+  ).dependsOn(sharedJvm)
+
+lazy val activationMessageHandler = (project in file("activation-message-handler"))
+  .settings(
+    name := "trainmapper--activation-message-handler"
+  ) .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe" % "config" % "1.3.3",
+      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
+      "com.github.etaty" %% "rediscala" % "1.8.0",
+      "com.itv" %% "bucky-core" % buckyVersion,
+      "com.itv" %% "bucky-rabbitmq" % buckyVersion,
+      "com.itv" %% "bucky-fs2" % buckyVersion,
+      "com.itv" %% "bucky-circe" % buckyVersion,
+      "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
+    mainClass in (Compile, run) := Some("trainmapper.ActivationHandlerMain")
   ).dependsOn(sharedJvm)
 
 
@@ -85,7 +100,6 @@ lazy val backend = (project in file("backend"))
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-      "com.github.etaty" %% "rediscala" % "1.8.0",
       "org.flywaydb" % "flyway-core" % "5.1.1",
       "io.circe" %% "circe-fs2" % circeVersion)
       ++ Seq(

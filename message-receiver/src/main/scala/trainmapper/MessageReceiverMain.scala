@@ -14,7 +14,7 @@ object MessageReceiverMain extends App with StrictLogging {
   val app = for {
     rabbitConfig        <- fs2.Stream.eval(IO(RabbitConfig.read))
     stompConfig         <- fs2.Stream.eval(IO(StompConfig.read))
-    rabbitClient        <- rabbitfs2.clientFrom(rabbitConfig, List(RabbitConfig.trainMovementsExchange))
+    rabbitClient        <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
     inboundMessageQueue <- fs2.Stream.eval(fs2.async.mutable.Queue.unbounded[IO, Message])
     stompHandler        <- fs2.Stream.eval(IO(Fs2MessageHandler[IO](inboundMessageQueue)))
     stompClient         <- fs2.Stream.eval(IO(StompClient[IO](stompConfig)))

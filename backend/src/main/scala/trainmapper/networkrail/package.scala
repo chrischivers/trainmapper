@@ -10,25 +10,6 @@ package object networkrail {
 
   object IncomingMessage {
 
-    val trainActivationIncomingDecoder: Decoder[TrainActivationMessage] {
-      def apply(c: HCursor): Result[TrainActivationMessage]
-    } = new Decoder[TrainActivationMessage] {
-
-      override def apply(c: HCursor): Result[TrainActivationMessage] = {
-        val bodyObject = c.downField("body")
-        for {
-          trainId              <- bodyObject.downField("train_id").as[TrainId]
-          trainServiceCode     <- bodyObject.downField("train_service_code").as[ServiceCode]
-          scheduleTrainId      <- bodyObject.downField("train_uid").as[ScheduleTrainId]
-          originStanox         <- bodyObject.downField("sched_origin_stanox").as[StanoxCode]
-          originDepartTimstamp <- bodyObject.downField("origin_dep_timestamp").as[Long]
-
-        } yield {
-          TrainActivationMessage(scheduleTrainId, trainServiceCode, trainId, originStanox, originDepartTimstamp)
-        }
-      }
-    }
-
     val trainMovementIncomingDecoder: Decoder[TrainMovementMessage] {
       def apply(c: HCursor): Result[TrainMovementMessage]
     } = new Decoder[TrainMovementMessage] {
@@ -97,20 +78,6 @@ package object networkrail {
                                   stanoxCode: Option[StanoxCode],
                                   variationStatus: Option[VariationStatus])
       extends IncomingMessage
-
-  case class TrainActivationMessage(scheduleTrainId: ScheduleTrainId,
-                                    trainServiceCode: ServiceCode,
-                                    trainId: TrainId,
-                                    originStanox: StanoxCode,
-                                    originDepartureTimestamp: Long)
-      extends IncomingMessage
-
-  object TrainActivationMessage {
-    import io.circe.generic.semiauto._
-
-    implicit val encoder = deriveEncoder[TrainActivationMessage]
-    implicit val decoder = deriveDecoder[TrainActivationMessage]
-  }
 
   private def emptyStringOptionToNone[A](in: Option[String])(f: String => A): Option[A] =
     if (in.contains("")) None else in.map(f)

@@ -6,9 +6,10 @@ import cats.syntax.functor._
 import io.circe.parser.parse
 import redis.{ByteStringDeserializer, ByteStringSerializer, RedisClient}
 import trainmapper.Shared.TrainId
-import trainmapper.networkrail.TrainActivationMessage
 import io.circe.syntax._
+import trainmapper.networkrail.ActivationMessageRmqHandler.TrainActivationMessage
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 object RedisCache {
@@ -27,18 +28,19 @@ object RedisCache {
 
   }
 
-  def apply(redisClient: RedisClient) = new Cache[TrainId, TrainActivationMessage] {
+  def apply(redisClient: RedisClient)(implicit executionContext: ExecutionContext) =
+    new Cache[TrainId, TrainActivationMessage] {
 
-    override def put(key: TrainId, rec: TrainActivationMessage)(expiry: Option[FiniteDuration]): IO[Unit] =
-      IO.fromFuture(
-          IO(redisClient
-            .set(key.value, rec, pxMilliseconds = expiry.map(_.toMillis))))
-        .void
+      override def put(key: TrainId, rec: TrainActivationMessage)(expiry: Option[FiniteDuration]): IO[Unit] =
+        IO.fromFuture(
+            IO(redisClient
+              .set(key.value, rec, pxMilliseconds = expiry.map(_.toMillis))))
+          .void
 
-    override def get(key: TrainId): IO[Option[TrainActivationMessage]] =
-      IO.fromFuture(IO {
-        redisClient.get[TrainActivationMessage](key.value)
-      })
+      override def get(key: TrainId): IO[Option[TrainActivationMessage]] =
+        IO.fromFuture(IO {
+          redisClient.get[TrainActivationMessage](key.value)
+        })
 
-  }
+    }
 }

@@ -21,15 +21,13 @@ object ActivationMessageHandler extends StrictLogging {
       implicit executionContext: ExecutionContext) =
     for {
       cache <- fs2.Stream.eval(IO(RedisCache(redisClient)))
-      _ <- fs2.Stream.eval(IO.unit).concurrently {
-        RequeueOps(rabbitClient)
-          .requeueHandlerOf[TrainActivationMessage](
-            RabbitConfig.activationQueue.name,
-            ActivationMessageRmqHandler(cache),
-            RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
-            TrainActivationMessage.unmarshallFromIncomingJson
-          )
-      }
+      _ <- RequeueOps(rabbitClient)
+        .requeueHandlerOf[TrainActivationMessage](
+          RabbitConfig.activationQueue.name,
+          ActivationMessageRmqHandler(cache),
+          RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
+          TrainActivationMessage.unmarshallFromIncomingJson
+        )
     } yield ()
 
 }

@@ -34,7 +34,7 @@ object MovementMessageReceiver extends StrictLogging {
             routingKeyFromMsgJson(msg).fold(
               err => IO(logger.error(s"Unable to decode routing key from message [$msg]. Error [$err]")),
               routingKey => {
-                IO(logger.info(s"publishing $msg to $routingKey")).flatMap(_ =>
+                IO(logger.info(s"publishing message to $routingKey")).flatMap(_ =>
                   publisher(publisherFrom(routingKey).toPublishCommand(msg)))
               }
             )

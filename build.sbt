@@ -66,6 +66,7 @@ lazy val backendMessageReceiver = (project in file("message-receiver"))
       .map((x: sbt.File) => new File(x.getAbsolutePath + ".map"))
       .data,
     (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
+    mainClass in (Compile, run) := Some("trainmapper.MessageReceiverMain")
   ).dependsOn(sharedJvm)
 
 

@@ -81,7 +81,7 @@ lazy val activationMessageHandler = (project in file("activation-message-handler
       "com.itv" %% "bucky-fs2" % buckyVersion,
       "com.itv" %% "bucky-circe" % buckyVersion,
       "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
-    mainClass in (Compile, run) := Some("trainmapper.ActivationHandlerMain")
+    mainClass in (Compile, run) := Some("trainmapper.ActivationMessageHandlerMain")
   ).dependsOn(sharedJvm)
 
 

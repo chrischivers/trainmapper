@@ -13,7 +13,7 @@ object RabbitConfig {
   val trainMovementsExchange = Exchange(ExchangeName("train-movements"), exchangeType = Topic)
     .binding(activationRoutingKey -> activationQueue.name)
 
-  val declarations = List[Declaration](activationQueue, trainMovementsExchange) ++ requeueDeclaration
+  val declarations = List[Declaration](trainMovementsExchange) ++ requeueDeclaration
 
   def read = {
     val config = ConfigFactory.load()

@@ -22,10 +22,10 @@ object ActivationHttp extends StrictLogging {
   def apply(cache: Cache[TrainId, TrainActivationMessage])(
       implicit executionContext: ExecutionContext): HttpService[IO] =
     HttpService[IO] {
-      case GET -> Root :? TrainIdMatcher(id) =>
+      case GET -> Root / "activation" :? TrainIdMatcher(id) =>
         cache
           .get(id)
-          .flatMap { _.fold(NotFound())(Ok(_)) }
+          .flatMap { _.fold(NotFound(s"Train id ${id.value} not found in cache"))(Ok(_)) }
 
     }
 

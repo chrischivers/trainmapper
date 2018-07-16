@@ -53,7 +53,7 @@ object ActivationMessageHandlerMain extends App {
   private def startServer(service: HttpService[IO], port: Int): Stream[IO, fs2.StreamApp.ExitCode] =
     BlazeBuilder[IO]
       .bindHttp(port, "0.0.0.0")
-      .mountService(service, "activation")
+      .mountService(service)
       .serve
 
   val app = for {

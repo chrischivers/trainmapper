@@ -8,6 +8,8 @@ import io.circe.HCursor
 import trainmapper.Shared.{ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
 import trainmapper.cache.Cache
 
+import scala.concurrent.duration.FiniteDuration
+
 object ActivationMessageRmqHandler extends StrictLogging {
 
   case class TrainActivationMessage(scheduleTrainId: ScheduleTrainId,
@@ -37,11 +39,12 @@ object ActivationMessageRmqHandler extends StrictLogging {
     implicit val decoder = deriveDecoder[TrainActivationMessage]
   }
 
-  def apply(cache: Cache[TrainId, TrainActivationMessage]) = new RequeueHandler[IO, TrainActivationMessage] {
-    override def apply(msg: TrainActivationMessage): IO[RequeueConsumeAction] = {
-      logger.info(s"Putting message with train id ${msg.trainId} into cache")
-      cache.put(msg.trainId, msg)(expiry = None).map(_ => Ack)
+  def apply(cache: Cache[TrainId, TrainActivationMessage], cacheExpiry: Option[FiniteDuration]) =
+    new RequeueHandler[IO, TrainActivationMessage] {
+      override def apply(msg: TrainActivationMessage): IO[RequeueConsumeAction] = {
+        logger.info(s"Putting message with train id ${msg.trainId} into cache with expiry $cacheExpiry")
+        cache.put(msg.trainId, msg)(expiry = cacheExpiry).map(_ => Ack)
+      }
     }
-  }
 
 }

@@ -17,6 +17,7 @@ import trainmapper.Shared.{ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
 import trainmapper.networkrail.ActivationMessageRmqHandler.TrainActivationMessage
 import trainmapper.{ActivationMessageHandler, RabbitConfig, StubRedisClient}
 import org.scalatest.Matchers._
+import trainmapper.StubRedisClient.ByteStringAndExpiry
 
 class HttpServiceTest extends FlatSpec {
 
@@ -35,16 +36,17 @@ class HttpServiceTest extends FlatSpec {
 
     //TODO extract as withApp
     for {
-      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteString]](Map.empty))
+      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringAndExpiry]](Map.empty))
       redisClient     <- Stream.eval(IO(StubRedisClient(redisCacheRef)))
       rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      app             <- ActivationMessageHandler.appFrom(redisClient, rabbitSimulator)
+      app             <- ActivationMessageHandler.appFrom(redisClient, rabbitSimulator, cacheExpiry = None)
       _               <- Stream.eval(IO.unit).concurrently(app.rabbit)
       _               <- Stream.eval(app.cache.put(expectedTrainId, expectedActivationMessage)(expiry = None))
       client          <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
       response <- Stream.eval(
-        client.expect[TrainActivationMessage](Uri(path = "/").withQueryParam("trainId", expectedTrainId.value)))
+        client.expect[TrainActivationMessage](
+          Uri(path = "/activation").withQueryParam("trainId", expectedTrainId.value)))
     } yield {
       response should ===(expectedActivationMessage)
     }

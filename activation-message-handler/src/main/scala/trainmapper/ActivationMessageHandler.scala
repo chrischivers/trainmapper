@@ -28,17 +28,20 @@ object ActivationMessageHandler extends StrictLogging {
                                          rabbit: fs2.Stream[IO, Unit],
                                          cache: Cache[TrainId, TrainActivationMessage])
 
-  def appFrom[E](redisClient: RedisClient, rabbitClient: RabbitClient[E])(implicit executionContext: ExecutionContext) =
+  def appFrom[E](redisClient: RedisClient, rabbitClient: RabbitClient[E], cacheExpiry: Option[FiniteDuration])(
+      implicit executionContext: ExecutionContext) =
     for {
       cache       <- fs2.Stream.eval(IO(RedisCache(redisClient)))
       httpService <- fs2.Stream.eval(IO(ActivationHttp(cache)))
-    } yield ActivationMessageHandlerApp(httpService, startRabbit(rabbitClient, cache), cache)
+    } yield ActivationMessageHandlerApp(httpService, startRabbit(rabbitClient, cache, cacheExpiry), cache)
 
-  private def startRabbit[E](rabbitClient: RabbitClient[E], cache: Cache[TrainId, TrainActivationMessage]) =
+  private def startRabbit[E](rabbitClient: RabbitClient[E],
+                             cache: Cache[TrainId, TrainActivationMessage],
+                             cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainActivationMessage](
         RabbitConfig.activationQueue.name,
-        ActivationMessageRmqHandler(cache),
+        ActivationMessageRmqHandler(cache, cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainActivationMessage.unmarshallFromIncomingJson
       )
@@ -57,12 +60,12 @@ object ActivationMessageHandlerMain extends App {
       .serve
 
   val app = for {
-    serverConfig <- fs2.Stream.eval(IO(ServerConfig.read))
+    appConfig    <- fs2.Stream.eval(IO(ServerConfig.read))
     rabbitConfig <- fs2.Stream.eval(IO(RabbitConfig.read))
     rabbitClient <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
     redisClient  <- fs2.Stream.eval(IO(RedisClient()))
-    app          <- ActivationMessageHandler.appFrom(redisClient, rabbitClient)
-    _ <- startServer(app.httpService, serverConfig.port).concurrently {
+    app          <- ActivationMessageHandler.appFrom(redisClient, rabbitClient, Some(appConfig.redisExpiry))
+    _ <- startServer(app.httpService, appConfig.port).concurrently {
       app.rabbit
     }
   } yield ()

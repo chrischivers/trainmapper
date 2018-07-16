@@ -1,12 +1,17 @@
 package trainmapper
 
+import java.util.concurrent.TimeUnit
+
 import com.typesafe.config.ConfigFactory
 
-object ServerConfig {
-  case class ServerConfig(port: Int)
+import scala.concurrent.duration.FiniteDuration
 
-  def read: ServerConfig = {
+object ServerConfig {
+  case class ApplicationConfig(port: Int, redisExpiry: FiniteDuration)
+
+  def read: ApplicationConfig = {
     val config = ConfigFactory.load()
-    ServerConfig(config.getInt("port"))
+    ApplicationConfig(config.getInt("port"),
+                      FiniteDuration(config.getDuration("activationExpiry").toMillis, TimeUnit.MILLISECONDS))
   }
 }

@@ -39,11 +39,13 @@ class ActivationMessageHandlerTest extends FlatSpec {
       rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       app             <- ActivationMessageHandler.appFrom(redisClient, rabbitSimulator)
+      _               <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
       _               <- Stream.eval(rabbitSimulator.publish(activationPublishingConfig.toPublishCommand(incomingMessage)))
       _               <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
       cache           <- Stream.eval(redisCacheRef.get)
     } yield {
       cache should have size 1
+      //todo more here
     }
   }
 

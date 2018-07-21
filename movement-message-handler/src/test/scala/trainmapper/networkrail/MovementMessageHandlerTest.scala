@@ -11,9 +11,11 @@ import com.itv.bucky._
 import com.itv.bucky.decl.DeclarationExecutor
 import com.itv.bucky.ext.{fs2 => extRabbitFs2}
 import com.itv.bucky.fs2.ioMonadError
+import org.http4s.Uri
 import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
+import trainmapper.ActivationLookupConfig.ActivationLookupConfig
 import trainmapper.Shared.{JourneyDetails, LatLng, MovementPacket, ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
 import trainmapper.StubHttpClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
@@ -50,12 +52,16 @@ class MovementMessageHandlerTest extends FlatSpec {
       rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      app             <- MovementMessageHandler.appFrom(redisClient, rabbitSimulator, httpClient, cacheExpiry = None)
-      _               <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
-      _               <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
-      _               <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
-      cacheRef        <- Stream.eval(redisCacheRef.get)
-      getFromCache    <- Stream.eval(app.cache.getList(expectedTrainId))
+      app <- MovementMessageHandler.appFrom(redisClient,
+                                            rabbitSimulator,
+                                            httpClient,
+                                            cacheExpiry = None,
+                                            ActivationLookupConfig(Uri(path = "/")))
+      _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
+      _            <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
+      _            <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
+      cacheRef     <- Stream.eval(redisCacheRef.get)
+      getFromCache <- Stream.eval(app.cache.getList(expectedTrainId))
     } yield {
       cacheRef should have size 1
       val expectedRecord = MovementPacket(expectedTrainId,
@@ -94,13 +100,17 @@ class MovementMessageHandlerTest extends FlatSpec {
       rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      app             <- MovementMessageHandler.appFrom(redisClient, rabbitSimulator, httpClient, cacheExpiry = None)
-      _               <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
-      _               <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage1)))
-      _               <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage2)))
-      _               <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
-      cacheRef        <- Stream.eval(redisCacheRef.get)
-      getFromCache    <- Stream.eval(app.cache.getList(expectedTrainId))
+      app <- MovementMessageHandler.appFrom(redisClient,
+                                            rabbitSimulator,
+                                            httpClient,
+                                            cacheExpiry = None,
+                                            ActivationLookupConfig(Uri(path = "/")))
+      _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
+      _            <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage1)))
+      _            <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage2)))
+      _            <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
+      cacheRef     <- Stream.eval(redisCacheRef.get)
+      getFromCache <- Stream.eval(app.cache.getList(expectedTrainId))
     } yield {
       cacheRef should have size 1
       cacheRef(expectedTrainId.value)._1 should have size 2
@@ -146,14 +156,18 @@ class MovementMessageHandlerTest extends FlatSpec {
       rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      app             <- MovementMessageHandler.appFrom(redisClient, rabbitSimulator, httpClient, cacheExpiry = Some(cacheExpiry))
-      _               <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
-      _               <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
-      _               <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
-      getFromCache1   <- Stream.eval(app.cache.getList(expectedTrainId))
-      _               <- Stream.eval(IO(getFromCache1 should have size 1))
-      _               <- Stream.eval(IO.sleep(cacheExpiry.plus(10.millisecond)))
-      getFromCache2   <- Stream.eval(app.cache.getList(expectedTrainId))
+      app <- MovementMessageHandler.appFrom(redisClient,
+                                            rabbitSimulator,
+                                            httpClient,
+                                            cacheExpiry = Some(cacheExpiry),
+                                            ActivationLookupConfig(Uri(path = "/")))
+      _             <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
+      _             <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
+      _             <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())
+      getFromCache1 <- Stream.eval(app.cache.getList(expectedTrainId))
+      _             <- Stream.eval(IO(getFromCache1 should have size 1))
+      _             <- Stream.eval(IO.sleep(cacheExpiry.plus(10.millisecond)))
+      getFromCache2 <- Stream.eval(app.cache.getList(expectedTrainId))
 
     } yield {
       getFromCache2 shouldBe empty

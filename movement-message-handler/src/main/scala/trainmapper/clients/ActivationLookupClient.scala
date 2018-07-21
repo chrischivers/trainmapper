@@ -29,7 +29,7 @@ object ActivationLookupClient extends StrictLogging {
   def apply(baseUri: Uri, client: Client[IO]) = new ActivationLookupClient {
     override def fetch(trainId: TrainId): IO[Option[ActivationResponse]] = {
       val uri = baseUri / "activation" / trainId.value
-      logger.info(s"Hitting activation lookup for train Id $trainId using url [$uri]")
+      logger.info(s"Hitting activation lookup for train Id $trainId using url [${uri.renderString}]")
       client.get[Option[ActivationResponse]](uri) { response =>
         if (response.status.code == 404) IO.pure(None)
         else response.as[ActivationResponse].map(Some(_))

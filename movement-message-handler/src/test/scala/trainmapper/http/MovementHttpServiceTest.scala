@@ -12,6 +12,7 @@ import org.http4s.circe.jsonOf
 import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
+import trainmapper.ActivationLookupConfig.ActivationLookupConfig
 import trainmapper.{MovementMessageHandler, RabbitConfig, StubHttpClient, StubRedisListClient}
 import trainmapper.Shared.{JourneyDetails, LatLng, MovementPacket, ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
 import trainmapper.StubHttpClient.TrainActivationMessage
@@ -61,11 +62,15 @@ class MovementHttpServiceTest extends FlatSpec {
       rabbitSimulator  <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _                <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       activationClient <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(Some(activationRecord)))))
-      app              <- MovementMessageHandler.appFrom(redisClient, rabbitSimulator, activationClient, cacheExpiry = None)
-      _                <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
-      _                <- Stream.eval(app.cache.push(expectedTrainId, movementPacket2)(expiry = None))
-      http             <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
-      response         <- Stream.eval(http.expect[List[MovementPacket]](Uri(path = s"/movements/${expectedTrainId.value}")))
+      app <- MovementMessageHandler.appFrom(redisClient,
+                                            rabbitSimulator,
+                                            activationClient,
+                                            cacheExpiry = None,
+                                            ActivationLookupConfig(Uri(path = "/")))
+      _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
+      _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket2)(expiry = None))
+      http     <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
+      response <- Stream.eval(http.expect[List[MovementPacket]](Uri(path = s"/movements/${expectedTrainId.value}")))
     } yield {
       response should ===(List(movementPacket1, movementPacket2).reverse)
     }

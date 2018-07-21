@@ -12,6 +12,7 @@ import org.http4s.client.blaze.Http1Client
 import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.{HttpService, Uri}
 import redis.RedisClient
+import trainmapper.ActivationLookupConfig._
 import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
 import trainmapper.clients.ActivationLookupClient
@@ -33,11 +34,12 @@ object MovementMessageHandler extends StrictLogging {
   def appFrom[E](redisClient: RedisClient,
                  rabbitClient: RabbitClient[E],
                  httpClient: Client[IO],
-                 cacheExpiry: Option[FiniteDuration])(implicit executionContext: ExecutionContext) =
+                 cacheExpiry: Option[FiniteDuration],
+                 activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
     for {
       cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
       httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
-      activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(Uri(path = "/"), httpClient)))
+      activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(activationLookupConfig.baseUri, httpClient)))
     } yield
       MovementMessageHandlerApp(httpService, startRabbit(rabbitClient, activationClient, cache, cacheExpiry), cache)
 
@@ -67,13 +69,18 @@ object ActivationMessageHandlerMain extends App {
       .serve
 
   val app = for {
-    appConfig    <- fs2.Stream.eval(IO(ServerConfig.read))
-    rabbitConfig <- fs2.Stream.eval(IO(RabbitConfig.read))
-    rabbitClient <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
-    redisClient  <- fs2.Stream.eval(IO(RedisClient()))
-    httpClient   <- Http1Client.stream[IO]()
-    app          <- MovementMessageHandler.appFrom(redisClient, rabbitClient, httpClient, Some(appConfig.movementExpiry))
-    _ <- startServer(app.httpService, appConfig.port).concurrently {
+    serverConfig           <- fs2.Stream.eval(IO(ServerConfig.read))
+    activationLookupConfig <- fs2.Stream.eval(IO(ActivationLookupConfig.read))
+    rabbitConfig           <- fs2.Stream.eval(IO(RabbitConfig.read))
+    rabbitClient           <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
+    redisClient            <- fs2.Stream.eval(IO(RedisClient()))
+    httpClient             <- Http1Client.stream[IO]()
+    app <- MovementMessageHandler.appFrom(redisClient,
+                                          rabbitClient,
+                                          httpClient,
+                                          Some(serverConfig.movementExpiry),
+                                          activationLookupConfig)
+    _ <- startServer(app.httpService, serverConfig.port).concurrently {
       app.rabbit
     }
   } yield ()

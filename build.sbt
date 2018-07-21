@@ -99,8 +99,6 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
       "mygrid" at "http://www.mygrid.org.uk/maven/repository/"
     ),
     libraryDependencies ++= Seq(
-      "io.chiv" %% "stompa-fs2" % stompaVersion,
-      "com.github.tototoshi" %% "scala-csv" % "1.3.5",
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",

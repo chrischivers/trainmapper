@@ -86,8 +86,6 @@ class ActivationMessageHandlerTest extends FlatSpec {
     }
   }
 
-  def evaluateStream[T](f: Stream[IO, Assertion]) = f.compile.drain.unsafeRunSync()
-
   def sampleIncomingActivationMessage(trainId: TrainId) = {
     val str =
       s"""
@@ -124,5 +122,7 @@ class ActivationMessageHandlerTest extends FlatSpec {
            """.stripMargin
     parse(str).right.get
   }
+
+  def evaluateStream[T](f: Stream[IO, Assertion]) = f.compile.drain.unsafeRunSync()
 
 }

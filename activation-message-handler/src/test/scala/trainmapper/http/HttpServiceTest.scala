@@ -5,7 +5,7 @@ import cats.effect.IO
 import com.itv.bucky.decl.DeclarationExecutor
 import fs2.Stream
 import fs2.async.Ref
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import trainmapper._
 import com.itv.bucky.ext.{fs2 => extRabbitFs2}
 import com.itv.bucky.future
@@ -45,10 +45,11 @@ class HttpServiceTest extends FlatSpec {
       _               <- Stream.eval(app.cache.put(expectedTrainId, expectedActivationMessage)(expiry = None))
       client          <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
       response <- Stream.eval(
-        client.expect[TrainActivationMessage](
-          Uri(path = "/activation").withQueryParam("trainId", expectedTrainId.value)))
+        client.expect[TrainActivationMessage](Uri(path = s"/activation/${expectedTrainId.value}")))
     } yield {
       response should ===(expectedActivationMessage)
     }
   }
+
+  def evaluateStream[T](f: Stream[IO, Assertion]) = f.compile.drain.unsafeRunSync()
 }

@@ -12,7 +12,7 @@ import trainmapper.networkrail.ActivationMessageRmqHandler.TrainActivationMessag
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-object RedisCache {
+object ActivationCache {
 
   implicit val byteStringSerializer = new ByteStringSerializer[TrainActivationMessage] {
     override def serialize(data: TrainActivationMessage): ByteString =
@@ -25,7 +25,6 @@ object RedisCache {
         json    <- parse(bs.utf8String)
         decoded <- json.as[TrainActivationMessage]
       } yield decoded).fold(err => throw err, identity)
-
   }
 
   def apply(redisClient: RedisClient)(implicit executionContext: ExecutionContext) =

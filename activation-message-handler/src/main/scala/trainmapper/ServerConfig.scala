@@ -7,7 +7,7 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent.duration.FiniteDuration
 
 object ServerConfig {
-  case class ApplicationConfig(port: Int, redisExpiry: FiniteDuration)
+  case class ApplicationConfig(port: Int, activationExpiry: FiniteDuration)
 
   def read: ApplicationConfig = {
     val config = ConfigFactory.load()

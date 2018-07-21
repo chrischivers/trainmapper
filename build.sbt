@@ -50,17 +50,17 @@ lazy val backendMessageReceiver = (project in file("message-receiver"))
   ) .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.chiv" %% "stompa-fs2" % stompaVersion,
-      "com.typesafe" % "config" % "1.3.3",
-      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "io.chiv"                    %% "stompa-fs2"               % stompaVersion,
+      "com.typesafe"               % "config"                    % "1.3.3",
+      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
       "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
-      "com.itv" %% "bucky-core" % buckyVersion,
-      "com.itv" %% "bucky-rabbitmq" % buckyVersion,
-      "com.itv" %% "bucky-fs2" % buckyVersion,
-      "com.itv" %% "bucky-circe" % buckyVersion,
-      "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
+      "com.itv"                    %% "bucky-core"               % buckyVersion,
+      "com.itv"                    %% "bucky-rabbitmq"           % buckyVersion,
+      "com.itv"                    %% "bucky-fs2"                % buckyVersion,
+      "com.itv"                    %% "bucky-circe"              % buckyVersion,
+      "com.itv"                    %% "bucky-test"               % buckyVersion  % "test"),
     mainClass in (Compile, run) := Some("trainmapper.MessageReceiverMain")
   ).dependsOn(sharedJvm)
 
@@ -70,28 +70,28 @@ lazy val activationMessageHandler = (project in file("activation-message-handler
   ) .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe" % "config" % "1.3.3",
-      "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "com.typesafe"               % "config"                    % "1.3.3",
+      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
       "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
-      "com.github.etaty" %% "rediscala" % "1.8.0",
+      "com.github.etaty"           %% "rediscala"                % "1.8.0",
       "org.http4s"                 %% "http4s-blaze-server"      % http4sVersion,
       "org.http4s"                 %% "http4s-blaze-client"      % http4sVersion,
       "org.http4s"                 %% "http4s-circe"             % http4sVersion,
       "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
-      "com.itv" %% "bucky-core" % buckyVersion,
-      "com.itv" %% "bucky-rabbitmq" % buckyVersion,
-      "com.itv" %% "bucky-fs2" % buckyVersion,
-      "com.itv" %% "bucky-circe" % buckyVersion,
-      "com.itv" %% "bucky-test"  % buckyVersion  % "test"),
+      "com.itv"                    %% "bucky-core"               % buckyVersion,
+      "com.itv"                    %% "bucky-rabbitmq"           % buckyVersion,
+      "com.itv"                    %% "bucky-fs2"                % buckyVersion,
+      "com.itv"                    %% "bucky-circe"              % buckyVersion,
+      "com.itv"                    %% "bucky-test"               % buckyVersion  % "test"),
     mainClass in (Compile, run) := Some("trainmapper.ActivationMessageHandlerMain")
   ).dependsOn(sharedJvm)
 
 
-lazy val backend = (project in file("backend"))
+lazy val movementMessageHandler = (project in file("movement-message-handler"))
   .settings(
-    name := "trainmapper-backend"
+    name := "trainmapper-movement-message-handler"
   )
   .settings(commonSettings)
   .settings(
@@ -104,14 +104,14 @@ lazy val backend = (project in file("backend"))
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-      "org.flywaydb" % "flyway-core" % "5.1.1",
+      "com.github.etaty"           %% "rediscala"                % "1.8.0",
       "io.circe" %% "circe-fs2" % circeVersion)
-      ++ Seq(
-      "org.tpolecat"               %% "doobie-core"             % doobieVersion,
-      "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
-      "org.tpolecat"               %% "doobie-postgres"         % doobieVersion,
-      "org.tpolecat"               %% "doobie-scalatest"        % doobieVersion % "test",
-      "org.tpolecat"               %% "doobie-h2"               % doobieVersion % "test"
+       ++ Seq (
+      "com.itv"                    %% "bucky-core"               % buckyVersion,
+      "com.itv"                    %% "bucky-rabbitmq"           % buckyVersion,
+      "com.itv"                    %% "bucky-fs2"                % buckyVersion,
+      "com.itv"                    %% "bucky-circe"              % buckyVersion,
+      "com.itv"                    %% "bucky-test"               % buckyVersion  % "test"
     )
       ++ Seq(
         "org.http4s"     %% "http4s-circe",
@@ -126,7 +126,7 @@ lazy val backend = (project in file("backend"))
     (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
     reStart := (reStart dependsOn (fastOptJS in (frontend, Compile))).evaluated,
     watchSources ++= (watchSources in frontend).value,
-    mainClass in reStart := Some("trainmapper.Main")
+    mainClass in reStart := Some("trainmapper.ActivationMessageHandlerMain")
   )
   .dependsOn(sharedJvm)
 

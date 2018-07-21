@@ -188,6 +188,7 @@ object Shared {
                             scheduleTrainId: ScheduleTrainId,
                             serviceCode: ServiceCode,
                             latLng: LatLng,
+                            stanoxCode: Option[StanoxCode],
                             actualTimeStamp: Long,
                             journeyDetails: JourneyDetails,
                             scheduleDetails: List[ScheduleDetailRecord])

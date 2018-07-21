@@ -12,7 +12,7 @@ import org.http4s.HttpService
 import org.http4s.server.blaze.BlazeBuilder
 import redis.RedisClient
 import trainmapper.Shared.TrainId
-import trainmapper.cache.{Cache, RedisCache}
+import trainmapper.cache.{Cache, ActivationCache}
 import trainmapper.http.ActivationHttp
 import trainmapper.networkrail.ActivationMessageRmqHandler
 import trainmapper.networkrail.ActivationMessageRmqHandler.TrainActivationMessage
@@ -31,7 +31,7 @@ object ActivationMessageHandler extends StrictLogging {
   def appFrom[E](redisClient: RedisClient, rabbitClient: RabbitClient[E], cacheExpiry: Option[FiniteDuration])(
       implicit executionContext: ExecutionContext) =
     for {
-      cache       <- fs2.Stream.eval(IO(RedisCache(redisClient)))
+      cache       <- fs2.Stream.eval(IO(ActivationCache(redisClient)))
       httpService <- fs2.Stream.eval(IO(ActivationHttp(cache)))
     } yield ActivationMessageHandlerApp(httpService, startRabbit(rabbitClient, cache, cacheExpiry), cache)
 
@@ -64,7 +64,7 @@ object ActivationMessageHandlerMain extends App {
     rabbitConfig <- fs2.Stream.eval(IO(RabbitConfig.read))
     rabbitClient <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
     redisClient  <- fs2.Stream.eval(IO(RedisClient()))
-    app          <- ActivationMessageHandler.appFrom(redisClient, rabbitClient, Some(appConfig.redisExpiry))
+    app          <- ActivationMessageHandler.appFrom(redisClient, rabbitClient, Some(appConfig.activationExpiry))
     _ <- startServer(app.httpService, appConfig.port).concurrently {
       app.rabbit
     }

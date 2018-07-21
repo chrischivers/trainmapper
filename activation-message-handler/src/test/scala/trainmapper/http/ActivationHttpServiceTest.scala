@@ -19,7 +19,7 @@ import trainmapper.{ActivationMessageHandler, RabbitConfig, StubRedisClient}
 import org.scalatest.Matchers._
 import trainmapper.StubRedisClient.ByteStringAndExpiry
 
-class HttpServiceTest extends FlatSpec {
+class ActivationHttpServiceTest extends FlatSpec {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val futureMonad   = future.futureMonad

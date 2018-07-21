@@ -36,7 +36,7 @@ object MovementMessageHandler extends StrictLogging {
                  cacheExpiry: Option[FiniteDuration])(implicit executionContext: ExecutionContext) =
     for {
       cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
-      httpService      <- fs2.Stream.eval(IO(MovementsHttp()))
+      httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
       activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(Uri(path = "/"), httpClient)))
     } yield
       MovementMessageHandlerApp(httpService, startRabbit(rabbitClient, activationClient, cache, cacheExpiry), cache)

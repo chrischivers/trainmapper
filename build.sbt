@@ -102,6 +102,9 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
       "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
       "com.github.etaty"           %% "rediscala"                % "1.8.0",
       "io.circe" %% "circe-fs2" % circeVersion)
        ++ Seq (

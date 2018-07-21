@@ -1,6 +1,7 @@
 package trainmapper.clients
 
 import cats.effect.IO
+import com.typesafe.scalalogging.StrictLogging
 import io.circe.generic.semiauto._
 import org.http4s.Uri
 import org.http4s.circe.jsonOf
@@ -13,7 +14,7 @@ trait ActivationLookupClient {
   def fetch(trainId: TrainId): IO[Option[ActivationResponse]]
 }
 
-object ActivationLookupClient {
+object ActivationLookupClient extends StrictLogging {
 
   case class ActivationResponse(scheduleTrainId: ScheduleTrainId,
                                 originStanox: StanoxCode,
@@ -26,10 +27,13 @@ object ActivationLookupClient {
   }
 
   def apply(baseUri: Uri, client: Client[IO]) = new ActivationLookupClient {
-    override def fetch(trainId: TrainId): IO[Option[ActivationResponse]] =
-      client.get[Option[ActivationResponse]](baseUri / "activation" / trainId.value) { response =>
+    override def fetch(trainId: TrainId): IO[Option[ActivationResponse]] = {
+      val uri = baseUri / "activation" / trainId.value
+      logger.info(s"Hitting activation lookup for train Id $trainId using url [$uri]")
+      client.get[Option[ActivationResponse]](uri) { response =>
         if (response.status.code == 404) IO.pure(None)
         else response.as[ActivationResponse].map(Some(_))
       }
+    }
   }
 }

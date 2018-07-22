@@ -1,6 +1,6 @@
 package trainmapper
 
-import java.time.LocalTime
+import java.time.{Instant, LocalTime, ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter
 
 import io.circe.{Decoder, Encoder, Json}
@@ -197,14 +197,25 @@ object Shared {
                             eventType: EventType,
                             latLng: LatLng,
                             actualTimeStamp: Long,
+                            actualTime: String,
                             plannedTimestamp: Option[Long],
+                            plannedTime: Option[String],
                             plannedPassengerTimestamp: Option[Long],
+                            plannedPassengerTime: Option[String],
                             variationStatus: Option[VariationStatus],
                             scheduleDetails: List[ScheduleDetailRecord])
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]
     implicit val decoder: Decoder[MovementPacket] = deriveDecoder[MovementPacket]
+
+    val dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+    def timeStampToString(timestamp: Long): String = {
+      val instant          = Instant.ofEpochMilli(timestamp)
+      val zonedDateTimeUtc = ZonedDateTime.ofInstant(instant, ZoneId.of("Europe/London"))
+      dateTimeFormatter.format(zonedDateTimeUtc)
+    }
   }
 
 }

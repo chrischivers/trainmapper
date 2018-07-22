@@ -101,8 +101,11 @@ object MovementMessageRmqHandler extends StrictLogging {
                 msg.eventType,
                 LatLng(0.0, 0.0),
                 msg.actualTimestamp,
+                MovementPacket.timeStampToString(msg.actualTimestamp),
                 msg.plannedTimestamp,
+                msg.plannedTimestamp.map(MovementPacket.timeStampToString),
                 msg.plannedPassengerTimestamp,
+                msg.plannedPassengerTimestamp.map(MovementPacket.timeStampToString),
                 msg.variationStatus,
                 List.empty
             ))

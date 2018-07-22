@@ -101,8 +101,11 @@ class MovementMessageHandlerTest extends FlatSpec {
         EventType.Arrival,
         LatLng(0.0, 0.0),
         actualTimestamp,
+        MovementPacket.timeStampToString(actualTimestamp),
         Some(actualTimestamp),
+        Some(MovementPacket.timeStampToString(actualTimestamp)),
         Some(actualTimestamp),
+        Some(MovementPacket.timeStampToString(actualTimestamp)),
         Some(VariationStatus.OnTime),
         List.empty
       )
@@ -183,8 +186,11 @@ class MovementMessageHandlerTest extends FlatSpec {
         EventType.Arrival,
         LatLng(0.0, 0.0),
         actualTimestamp1,
+        MovementPacket.timeStampToString(actualTimestamp1),
         Some(actualTimestamp1),
+        Some(MovementPacket.timeStampToString(actualTimestamp1)),
         Some(actualTimestamp1),
+        Some(MovementPacket.timeStampToString(actualTimestamp1)),
         Some(VariationStatus.OnTime),
         List.empty
       )
@@ -198,8 +204,11 @@ class MovementMessageHandlerTest extends FlatSpec {
         EventType.Departure,
         LatLng(0.0, 0.0),
         actualTimestamp2,
+        MovementPacket.timeStampToString(actualTimestamp2),
         Some(actualTimestamp2),
+        Some(MovementPacket.timeStampToString(actualTimestamp2)),
         Some(actualTimestamp2),
+        Some(MovementPacket.timeStampToString(actualTimestamp2)),
         Some(VariationStatus.OnTime),
         List.empty
       )

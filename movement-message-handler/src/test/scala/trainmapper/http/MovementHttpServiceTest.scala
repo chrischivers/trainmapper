@@ -54,8 +54,11 @@ class MovementHttpServiceTest extends FlatSpec {
       EventType.Arrival,
       LatLng(0.0, 0.0),
       actualTimestamp1,
+      MovementPacket.timeStampToString(actualTimestamp1),
       Some(actualTimestamp1),
+      Some(MovementPacket.timeStampToString(actualTimestamp1)),
       Some(actualTimestamp1),
+      Some(MovementPacket.timeStampToString(actualTimestamp1)),
       Some(VariationStatus.OnTime),
       List.empty
     )
@@ -69,8 +72,11 @@ class MovementHttpServiceTest extends FlatSpec {
       EventType.Departure,
       LatLng(0.0, 0.0),
       actualTimestamp2,
+      MovementPacket.timeStampToString(actualTimestamp2),
       Some(actualTimestamp2 + 60000),
+      Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
       Some(actualTimestamp2 + 60000),
+      Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
       Some(VariationStatus.Early),
       List.empty
     )

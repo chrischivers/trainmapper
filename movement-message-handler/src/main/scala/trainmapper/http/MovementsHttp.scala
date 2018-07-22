@@ -20,7 +20,7 @@ object MovementsHttp extends StrictLogging {
   def apply(cache: ListCache[TrainId, MovementPacket])(implicit executionContext: ExecutionContext): HttpService[IO] =
     HttpService[IO] {
       case GET -> Root / "movements" / trainId =>
-        Ok(cache.getList(TrainId(trainId)).map(_.asJson))
+        Ok(cache.getList(TrainId(trainId)).map(_.sortWith(_.actualTimeStamp > _.actualTimeStamp)).map(_.asJson))
 
     }
 

@@ -213,7 +213,7 @@ object Shared {
 
     def timeStampToString(timestamp: Long): String = {
       val instant          = Instant.ofEpochMilli(timestamp)
-      val zonedDateTimeUtc = ZonedDateTime.ofInstant(instant, ZoneId.of("Europe/London"))
+      val zonedDateTimeUtc = ZonedDateTime.ofInstant(instant, ZoneId.of("UTC"))
       dateTimeFormatter.format(zonedDateTimeUtc)
     }
   }

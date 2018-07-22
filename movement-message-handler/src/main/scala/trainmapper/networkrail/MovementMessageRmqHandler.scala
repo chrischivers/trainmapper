@@ -19,6 +19,7 @@ import trainmapper.Shared.{
 }
 import trainmapper.cache.ListCache
 import trainmapper.clients.ActivationLookupClient
+import trainmapper.reference.StopReference
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -81,6 +82,7 @@ object MovementMessageRmqHandler extends StrictLogging {
   }
 
   def apply(activationLookupClient: ActivationLookupClient,
+            stopReference: StopReference,
             cache: ListCache[TrainId, MovementPacket],
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
@@ -95,6 +97,7 @@ object MovementMessageRmqHandler extends StrictLogging {
                 msg.trainServiceCode,
                 msg.toc,
                 msg.stanoxCode,
+                msg.stanoxCode.flatMap(stopReference.referenceFor),
                 msg.eventType,
                 LatLng(0.0, 0.0),
                 msg.actualTimestamp,

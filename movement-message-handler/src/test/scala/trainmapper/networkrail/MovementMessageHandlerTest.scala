@@ -17,19 +17,22 @@ import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
 import trainmapper.Shared.{
+  CRS,
   EventType,
   LatLng,
   MovementPacket,
   ScheduleTrainId,
   ServiceCode,
   StanoxCode,
+  StopReferenceDetails,
   TOC,
+  TipLocCode,
   TrainId,
   VariationStatus
 }
 import trainmapper.StubHttpClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
-import trainmapper.{MovementMessageHandler, RabbitConfig, StubHttpClient, StubRedisListClient}
+import trainmapper._
 
 class MovementMessageHandlerTest extends FlatSpec {
 
@@ -65,15 +68,20 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                         VariationStatus.OnTime,
                                                         toc)
 
+    val stopReferenceDetails =
+      StopReferenceDetails("Description", Some(CRS("Some CRS")), Some(TipLocCode("Some Tiploc")), Some(stanoxCode))
+
     for {
-      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient        <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,
+                                            railwayCodesClient,
                                             cacheExpiry = None,
                                             ActivationLookupConfig(Uri(path = "/")))
       _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
@@ -89,6 +97,7 @@ class MovementMessageHandlerTest extends FlatSpec {
         serviceCode,
         toc,
         Some(stanoxCode),
+        Some(stopReferenceDetails),
         EventType.Arrival,
         LatLng(0.0, 0.0),
         actualTimestamp,
@@ -136,15 +145,23 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                          VariationStatus.OnTime,
                                                          toc)
 
+    val stopReferenceDetails1 =
+      StopReferenceDetails("Description1", Some(CRS("CRS1")), Some(TipLocCode("Tiploc1")), Some(stanoxCode1))
+
+    val stopReferenceDetails2 =
+      StopReferenceDetails("Description1", Some(CRS("CRS2")), Some(TipLocCode("Tiploc2")), Some(stanoxCode2))
+
     for {
-      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient        <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails1, stopReferenceDetails2))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,
+                                            railwayCodesClient,
                                             cacheExpiry = None,
                                             ActivationLookupConfig(Uri(path = "/")))
       _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
@@ -162,6 +179,7 @@ class MovementMessageHandlerTest extends FlatSpec {
         serviceCode,
         toc,
         Some(stanoxCode1),
+        Some(stopReferenceDetails1),
         EventType.Arrival,
         LatLng(0.0, 0.0),
         actualTimestamp1,
@@ -176,6 +194,7 @@ class MovementMessageHandlerTest extends FlatSpec {
         serviceCode,
         toc,
         Some(stanoxCode2),
+        Some(stopReferenceDetails2),
         EventType.Departure,
         LatLng(0.0, 0.0),
         actualTimestamp2,
@@ -213,15 +232,20 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                         VariationStatus.OnTime,
                                                         toc)
 
+    val stopReferenceDetails =
+      StopReferenceDetails("Description", Some(CRS("CRS")), Some(TipLocCode("Tiploc")), Some(stanoxCode))
+
     for {
-      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient        <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,
+                                            railwayCodesClient,
                                             cacheExpiry = Some(cacheExpiry),
                                             ActivationLookupConfig(Uri(path = "/")))
       _             <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?

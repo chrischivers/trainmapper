@@ -77,6 +77,12 @@ object Shared {
     implicit val encoder: Encoder[StanoxCode] = Encoder[StanoxCode](a => Json.fromString(a.value))
   }
 
+  case class CRS(value: String)
+  object CRS {
+    implicit val decoder: Decoder[CRS] = Decoder.decodeString.map(CRS(_))
+    implicit val encoder: Encoder[CRS] = Encoder[CRS](a => Json.fromString(a.value))
+  }
+
   case class TipLocCode(value: String)
 
   object TipLocCode {
@@ -160,6 +166,15 @@ object Shared {
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
   }
 
+  case class StopReferenceDetails(description: String,
+                                  crs: Option[CRS],
+                                  tiploc: Option[TipLocCode],
+                                  stanox: Option[StanoxCode])
+  object StopReferenceDetails {
+    implicit val encoder = deriveEncoder[StopReferenceDetails]
+    implicit val decoder = deriveDecoder[StopReferenceDetails]
+  }
+
   case class ScheduleDetailRecord(sequence: Int,
                                   tipLocCode: TipLocCode,
                                   stanoxCode: Option[StanoxCode],
@@ -178,6 +193,7 @@ object Shared {
                             serviceCode: ServiceCode,
                             toc: TOC,
                             stanoxCode: Option[StanoxCode],
+                            stopReferenceDetails: Option[StopReferenceDetails],
                             eventType: EventType,
                             latLng: LatLng,
                             actualTimeStamp: Long,

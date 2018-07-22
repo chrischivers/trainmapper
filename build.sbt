@@ -44,6 +44,25 @@ lazy val shared =
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js
 
+//lazy val scheduleLoader = (project in file("schedule-loader"))
+//  .settings(
+//    name := "trainmapper-schedule-loader"
+//  ) .settings(commonSettings)
+//  .settings(
+//    libraryDependencies ++= Seq(
+//      "com.typesafe"               % "config"                    % "1.3.3",
+//      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
+//      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+//      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+//      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
+//      "org.http4s"                 %% "http4s-blaze-server"      % http4sVersion,
+//      "org.http4s"                 %% "http4s-blaze-client"      % http4sVersion,
+//      "org.http4s"                 %% "http4s-circe"             % http4sVersion,
+//      "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
+//      "net.ruippeixotog"          %% "scala-scraper"             % "2.1.0"),
+//    mainClass in (Compile, run) := Some("trainmapper.Main")
+//  ).dependsOn(sharedJvm)
+
 lazy val backendMessageReceiver = (project in file("message-receiver"))
   .settings(
     name := "trainmapper-message-receiver"
@@ -106,6 +125,7 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
       "com.github.etaty"           %% "rediscala"                % "1.8.0",
+      "net.ruippeixotog"          %% "scala-scraper"             % "2.1.0",
       "io.circe" %% "circe-fs2" % circeVersion)
        ++ Seq (
       "com.itv"                    %% "bucky-core"               % buckyVersion,

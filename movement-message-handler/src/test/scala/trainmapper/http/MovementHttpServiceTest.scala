@@ -13,7 +13,7 @@ import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
-import trainmapper.{MovementMessageHandler, RabbitConfig, StubHttpClient, StubRedisListClient}
+import trainmapper._
 import trainmapper.Shared.{
   EventType,
   LatLng,
@@ -21,6 +21,7 @@ import trainmapper.Shared.{
   ScheduleTrainId,
   ServiceCode,
   StanoxCode,
+  StopReferenceDetails,
   TOC,
   TrainId,
   VariationStatus
@@ -49,6 +50,7 @@ class MovementHttpServiceTest extends FlatSpec {
       serviceCode,
       TOC("AA"),
       Some(stanoxCode1),
+      Some(StopReferenceDetails("description1", None, None, Some(stanoxCode1))),
       EventType.Arrival,
       LatLng(0.0, 0.0),
       actualTimestamp1,
@@ -63,6 +65,7 @@ class MovementHttpServiceTest extends FlatSpec {
       serviceCode,
       TOC("AA"),
       Some(stanoxCode2),
+      Some(StopReferenceDetails("description2", None, None, Some(stanoxCode2))),
       EventType.Departure,
       LatLng(0.0, 0.0),
       actualTimestamp2,
@@ -84,9 +87,13 @@ class MovementHttpServiceTest extends FlatSpec {
       rabbitSimulator  <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _                <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       activationClient <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(Some(activationRecord)))))
+      railwayCodesClient <- Stream.eval(
+        IO(StubRailwayCodesClient(
+          List(movementPacket1.stopReferenceDetails.get, movementPacket2.stopReferenceDetails.get))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             activationClient,
+                                            railwayCodesClient,
                                             cacheExpiry = None,
                                             ActivationLookupConfig(Uri(path = "/")))
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))

@@ -15,10 +15,11 @@ import redis.RedisClient
 import trainmapper.ActivationLookupConfig._
 import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
-import trainmapper.clients.ActivationLookupClient
+import trainmapper.clients.{ActivationLookupClient, RailwaysCodesClient}
 import trainmapper.http.MovementsHttp
 import trainmapper.networkrail.MovementMessageRmqHandler
 import trainmapper.networkrail.MovementMessageRmqHandler.TrainMovementMessage
+import trainmapper.reference.StopReference
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -34,23 +35,28 @@ object MovementMessageHandler extends StrictLogging {
   def appFrom[E](redisClient: RedisClient,
                  rabbitClient: RabbitClient[E],
                  httpClient: Client[IO],
+                 railwaysCodesClient: RailwaysCodesClient,
                  cacheExpiry: Option[FiniteDuration],
                  activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
     for {
       cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
       httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
       activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(activationLookupConfig.baseUri, httpClient)))
+      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient)))
     } yield
-      MovementMessageHandlerApp(httpService, startRabbit(rabbitClient, activationClient, cache, cacheExpiry), cache)
+      MovementMessageHandlerApp(httpService,
+                                startRabbit(rabbitClient, activationClient, stopReference, cache, cacheExpiry),
+                                cache)
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
+                             stopReference: StopReference,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient, cache, cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient, stopReference, cache, cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )
@@ -75,9 +81,11 @@ object ActivationMessageHandlerMain extends App {
     rabbitClient           <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
     redisClient            <- fs2.Stream.eval(IO(RedisClient()))
     httpClient             <- Http1Client.stream[IO]()
+    railwayCodesClient     <- fs2.Stream.eval(IO(RailwaysCodesClient()))
     app <- MovementMessageHandler.appFrom(redisClient,
                                           rabbitClient,
                                           httpClient,
+                                          railwayCodesClient,
                                           Some(serverConfig.movementExpiry),
                                           activationLookupConfig)
     _ <- startServer(app.httpService, serverConfig.port).concurrently {

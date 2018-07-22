@@ -14,7 +14,17 @@ import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
 import trainmapper.{MovementMessageHandler, RabbitConfig, StubHttpClient, StubRedisListClient}
-import trainmapper.Shared.{JourneyDetails, LatLng, MovementPacket, ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
+import trainmapper.Shared.{
+  EventType,
+  LatLng,
+  MovementPacket,
+  ScheduleTrainId,
+  ServiceCode,
+  StanoxCode,
+  TOC,
+  TrainId,
+  VariationStatus
+}
 import trainmapper.StubHttpClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
 
@@ -33,22 +43,34 @@ class MovementHttpServiceTest extends FlatSpec {
     val stanoxCode2      = StanoxCode("HDJDSF")
     val actualTimestamp1 = System.currentTimeMillis()
     val actualTimestamp2 = actualTimestamp1 + 120000
-    val movementPacket1 = MovementPacket(expectedTrainId,
-                                         scheduleTrainId,
-                                         serviceCode,
-                                         LatLng(0.0, 0.0),
-                                         Some(stanoxCode1),
-                                         actualTimestamp1,
-                                         JourneyDetails("", 0L),
-                                         List.empty)
-    val movementPacket2 = MovementPacket(expectedTrainId,
-                                         scheduleTrainId,
-                                         serviceCode,
-                                         LatLng(0.0, 0.0),
-                                         Some(stanoxCode2),
-                                         actualTimestamp2,
-                                         JourneyDetails("", 0L),
-                                         List.empty)
+    val movementPacket1 = MovementPacket(
+      expectedTrainId,
+      scheduleTrainId,
+      serviceCode,
+      TOC("AA"),
+      Some(stanoxCode1),
+      EventType.Arrival,
+      LatLng(0.0, 0.0),
+      actualTimestamp1,
+      Some(actualTimestamp1),
+      Some(actualTimestamp1),
+      Some(VariationStatus.OnTime),
+      List.empty
+    )
+    val movementPacket2 = MovementPacket(
+      expectedTrainId,
+      scheduleTrainId,
+      serviceCode,
+      TOC("AA"),
+      Some(stanoxCode2),
+      EventType.Departure,
+      LatLng(0.0, 0.0),
+      actualTimestamp2,
+      Some(actualTimestamp2 + 60000),
+      Some(actualTimestamp2 + 60000),
+      Some(VariationStatus.Early),
+      List.empty
+    )
 
     val activationRecord = TrainActivationMessage(scheduleTrainId,
                                                   serviceCode,

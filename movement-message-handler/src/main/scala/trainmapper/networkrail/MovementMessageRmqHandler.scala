@@ -8,7 +8,6 @@ import fs2.async.mutable.Queue
 import io.circe.HCursor
 import trainmapper.Shared.{
   EventType,
-  JourneyDetails,
   LatLng,
   MovementPacket,
   ScheduleTrainId,
@@ -90,14 +89,20 @@ object MovementMessageRmqHandler extends StrictLogging {
           activationRecord <- activationLookupClient.fetch(msg.trainId)
           movementPacketOpt = activationRecord.map(
             activation =>
-              MovementPacket(msg.trainId,
-                             activation.scheduleTrainId,
-                             msg.trainServiceCode,
-                             LatLng(0.0, 0.0),
-                             msg.stanoxCode,
-                             msg.actualTimestamp,
-                             JourneyDetails("", 0L),
-                             List.empty))
+              MovementPacket(
+                msg.trainId,
+                activation.scheduleTrainId,
+                msg.trainServiceCode,
+                msg.toc,
+                msg.stanoxCode,
+                msg.eventType,
+                LatLng(0.0, 0.0),
+                msg.actualTimestamp,
+                msg.plannedTimestamp,
+                msg.plannedPassengerTimestamp,
+                msg.variationStatus,
+                List.empty
+            ))
           _ <- movementPacketOpt.fold {
             IO(logger.info(s"No activation record found for train Id ${msg.trainId.value}"))
           }(packet => cache.push(msg.trainId, packet)(cacheExpiry))

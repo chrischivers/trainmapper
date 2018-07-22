@@ -16,7 +16,17 @@ import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
-import trainmapper.Shared.{JourneyDetails, LatLng, MovementPacket, ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
+import trainmapper.Shared.{
+  EventType,
+  LatLng,
+  MovementPacket,
+  ScheduleTrainId,
+  ServiceCode,
+  StanoxCode,
+  TOC,
+  TrainId,
+  VariationStatus
+}
 import trainmapper.StubHttpClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
 import trainmapper.{MovementMessageHandler, RabbitConfig, StubHttpClient, StubRedisListClient}
@@ -38,13 +48,22 @@ class MovementMessageHandlerTest extends FlatSpec {
     val scheduleTrainId = ScheduleTrainId("7234AD")
     val serviceCode     = ServiceCode("AAAA")
     val stanoxCode      = StanoxCode("YEHFJS")
+    val toc             = TOC("AA")
     val activationRecord = TrainActivationMessage(scheduleTrainId,
                                                   serviceCode,
                                                   expectedTrainId,
                                                   StanoxCode("ORIGINSTANOX"),
                                                   System.currentTimeMillis() - 600000)
     val actualTimestamp = System.currentTimeMillis()
-    val incomingMessage = sampleIncomingMovementMessage(expectedTrainId, actualTimestamp, serviceCode, stanoxCode)
+    val incomingMessage = sampleIncomingMovementMessage(expectedTrainId,
+                                                        actualTimestamp,
+                                                        serviceCode,
+                                                        stanoxCode,
+                                                        EventType.Arrival,
+                                                        actualTimestamp,
+                                                        actualTimestamp,
+                                                        VariationStatus.OnTime,
+                                                        toc)
 
     for {
       redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -64,14 +83,20 @@ class MovementMessageHandlerTest extends FlatSpec {
       getFromCache <- Stream.eval(app.cache.getList(expectedTrainId))
     } yield {
       cacheRef should have size 1
-      val expectedRecord = MovementPacket(expectedTrainId,
-                                          scheduleTrainId,
-                                          serviceCode,
-                                          LatLng(0.0, 0.0),
-                                          Some(stanoxCode),
-                                          actualTimestamp,
-                                          JourneyDetails("", 0L),
-                                          List.empty)
+      val expectedRecord = MovementPacket(
+        expectedTrainId,
+        scheduleTrainId,
+        serviceCode,
+        toc,
+        Some(stanoxCode),
+        EventType.Arrival,
+        LatLng(0.0, 0.0),
+        actualTimestamp,
+        Some(actualTimestamp),
+        Some(actualTimestamp),
+        Some(VariationStatus.OnTime),
+        List.empty
+      )
       getFromCache should ===(List(expectedRecord))
     }
   }
@@ -81,6 +106,7 @@ class MovementMessageHandlerTest extends FlatSpec {
     val expectedTrainId = TrainId("1234567")
     val scheduleTrainId = ScheduleTrainId("7234AD")
     val serviceCode     = ServiceCode("AAAA")
+    val toc             = TOC("AA")
 
     val activationRecord = TrainActivationMessage(scheduleTrainId,
                                                   serviceCode,
@@ -91,8 +117,24 @@ class MovementMessageHandlerTest extends FlatSpec {
     val actualTimestamp2 = actualTimestamp1 + 120000
     val stanoxCode1      = StanoxCode("AYENDD")
     val stanoxCode2      = StanoxCode("SHDJS2")
-    val incomingMessage1 = sampleIncomingMovementMessage(expectedTrainId, actualTimestamp1, serviceCode, stanoxCode1)
-    val incomingMessage2 = sampleIncomingMovementMessage(expectedTrainId, actualTimestamp2, serviceCode, stanoxCode2)
+    val incomingMessage1 = sampleIncomingMovementMessage(expectedTrainId,
+                                                         actualTimestamp1,
+                                                         serviceCode,
+                                                         stanoxCode1,
+                                                         EventType.Arrival,
+                                                         actualTimestamp1,
+                                                         actualTimestamp1,
+                                                         VariationStatus.OnTime,
+                                                         toc)
+    val incomingMessage2 = sampleIncomingMovementMessage(expectedTrainId,
+                                                         actualTimestamp2,
+                                                         serviceCode,
+                                                         stanoxCode2,
+                                                         EventType.Departure,
+                                                         actualTimestamp2,
+                                                         actualTimestamp2,
+                                                         VariationStatus.OnTime,
+                                                         toc)
 
     for {
       redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -114,22 +156,34 @@ class MovementMessageHandlerTest extends FlatSpec {
     } yield {
       cacheRef should have size 1
       cacheRef(expectedTrainId.value)._1 should have size 2
-      val expectedRecord1 = MovementPacket(expectedTrainId,
-                                           scheduleTrainId,
-                                           serviceCode,
-                                           LatLng(0.0, 0.0),
-                                           Some(stanoxCode1),
-                                           actualTimestamp1,
-                                           JourneyDetails("", 0L),
-                                           List.empty)
-      val expectedRecord2 = MovementPacket(expectedTrainId,
-                                           scheduleTrainId,
-                                           serviceCode,
-                                           LatLng(0.0, 0.0),
-                                           Some(stanoxCode2),
-                                           actualTimestamp2,
-                                           JourneyDetails("", 0L),
-                                           List.empty)
+      val expectedRecord1 = MovementPacket(
+        expectedTrainId,
+        scheduleTrainId,
+        serviceCode,
+        toc,
+        Some(stanoxCode1),
+        EventType.Arrival,
+        LatLng(0.0, 0.0),
+        actualTimestamp1,
+        Some(actualTimestamp1),
+        Some(actualTimestamp1),
+        Some(VariationStatus.OnTime),
+        List.empty
+      )
+      val expectedRecord2 = MovementPacket(
+        expectedTrainId,
+        scheduleTrainId,
+        serviceCode,
+        toc,
+        Some(stanoxCode2),
+        EventType.Departure,
+        LatLng(0.0, 0.0),
+        actualTimestamp2,
+        Some(actualTimestamp2),
+        Some(actualTimestamp2),
+        Some(VariationStatus.OnTime),
+        List.empty
+      )
       getFromCache should ===(List(expectedRecord1, expectedRecord2).reverse)
     }
   }
@@ -142,13 +196,22 @@ class MovementMessageHandlerTest extends FlatSpec {
     val scheduleTrainId = ScheduleTrainId("7234AD")
     val serviceCode     = ServiceCode("AAAA")
     val stanoxCode      = StanoxCode("YEHFJS")
+    val toc             = TOC("BB")
     val activationRecord = TrainActivationMessage(scheduleTrainId,
                                                   serviceCode,
                                                   expectedTrainId,
                                                   StanoxCode("ORIGINSTANOX"),
                                                   System.currentTimeMillis() - 600000)
     val actualTimestamp = System.currentTimeMillis()
-    val incomingMessage = sampleIncomingMovementMessage(expectedTrainId, actualTimestamp, serviceCode, stanoxCode)
+    val incomingMessage = sampleIncomingMovementMessage(expectedTrainId,
+                                                        actualTimestamp,
+                                                        serviceCode,
+                                                        stanoxCode,
+                                                        EventType.Arrival,
+                                                        actualTimestamp,
+                                                        actualTimestamp,
+                                                        VariationStatus.OnTime,
+                                                        toc)
 
     for {
       redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -179,7 +242,12 @@ class MovementMessageHandlerTest extends FlatSpec {
   def sampleIncomingMovementMessage(trainId: TrainId,
                                     actualTimestamp: Long,
                                     serviceCode: ServiceCode,
-                                    stanoxCode: StanoxCode) = {
+                                    stanoxCode: StanoxCode,
+                                    eventType: EventType,
+                                    plannedTimestamp: Long,
+                                    plannedPassengerTimestamp: Long,
+                                    variationStatus: VariationStatus,
+                                    toc: TOC) = {
     val str =
       s"""
              |   {
@@ -192,10 +260,10 @@ class MovementMessageHandlerTest extends FlatSpec {
              |         "source_system_id":"TRUST"
              |      },
              |      "body":{
-             |         "event_type":"ARRIVAL",
-             |         "gbtt_timestamp":"1529358120000",
+             |         "event_type":"${eventType.string}",
+             |         "gbtt_timestamp":"$plannedPassengerTimestamp",
              |         "original_loc_stanox":"",
-             |         "planned_timestamp":"1529358090000",
+             |         "planned_timestamp":"$plannedTimestamp",
              |         "timetable_variation":"1",
              |         "original_loc_timestamp":"",
              |         "current_train_id":"",
@@ -211,9 +279,9 @@ class MovementMessageHandlerTest extends FlatSpec {
              |         "train_terminated":"false",
              |         "train_id":"${trainId.value}",
              |         "offroute_ind":"false",
-             |         "variation_status":"EARLY",
+             |         "variation_status":"${variationStatus.string}",
              |         "train_service_code":"${serviceCode.value}",
-             |         "toc_id":"64",
+             |         "toc_id":"${toc.value}",
              |         "loc_stanox":"${stanoxCode.value}",
              |         "auto_expected":"true",
              |         "direction_ind":"UP",

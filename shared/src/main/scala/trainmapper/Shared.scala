@@ -95,29 +95,24 @@ object Shared {
 
   sealed trait VariationStatus {
     val string: String
-    val notifiable: Boolean
   }
 
   object VariationStatus {
 
     case object OnTime extends VariationStatus {
-      override val string: String      = "ON TIME"
-      override val notifiable: Boolean = false
+      override val string: String = "ON TIME"
     }
 
     case object Early extends VariationStatus {
-      override val string: String      = "EARLY"
-      override val notifiable: Boolean = false
+      override val string: String = "EARLY"
     }
 
     case object Late extends VariationStatus {
-      override val string: String      = "LATE"
-      override val notifiable: Boolean = true
+      override val string: String = "LATE"
     }
 
     case object OffRoute extends VariationStatus {
-      override val string: String      = "OFF ROUTE"
-      override val notifiable: Boolean = true
+      override val string: String = "OFF ROUTE"
     }
 
     def fromString(str: String): VariationStatus =
@@ -129,6 +124,7 @@ object Shared {
       }
 
     implicit val decoder: Decoder[VariationStatus] = Decoder.decodeString.map(fromString)
+    implicit val encoder: Encoder[VariationStatus] = (a: VariationStatus) => Json.fromString(a.string)
   }
 
   sealed trait LocationType {
@@ -164,13 +160,6 @@ object Shared {
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
   }
 
-  case class JourneyDetails(originStationName: String, originDepartureTimestamp: Long)
-
-  object JourneyDetails {
-    implicit val encoder: Encoder[JourneyDetails] = deriveEncoder[JourneyDetails]
-    implicit val decoder: Decoder[JourneyDetails] = deriveDecoder[JourneyDetails]
-  }
-
   case class ScheduleDetailRecord(sequence: Int,
                                   tipLocCode: TipLocCode,
                                   stanoxCode: Option[StanoxCode],
@@ -187,10 +176,14 @@ object Shared {
   case class MovementPacket(trainId: TrainId,
                             scheduleTrainId: ScheduleTrainId,
                             serviceCode: ServiceCode,
-                            latLng: LatLng,
+                            toc: TOC,
                             stanoxCode: Option[StanoxCode],
+                            eventType: EventType,
+                            latLng: LatLng,
                             actualTimeStamp: Long,
-                            journeyDetails: JourneyDetails,
+                            plannedTimestamp: Option[Long],
+                            plannedPassengerTimestamp: Option[Long],
+                            variationStatus: Option[VariationStatus],
                             scheduleDetails: List[ScheduleDetailRecord])
 
   object MovementPacket {

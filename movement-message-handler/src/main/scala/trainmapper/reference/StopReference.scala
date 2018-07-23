@@ -16,11 +16,11 @@ trait StopReference {
 
 object StopReference extends StrictLogging {
 
-  def apply(railwaysCodesClient: RailwaysCodesClient) = new StopReference {
+  def apply(railwaysCodesClient: RailwaysCodesClient, railReferencesPath: String) = new StopReference {
 
     lazy val railReferencesCSV: List[Map[String, String]] = {
       logger.info("Loading csv reader for rail references")
-      val csvReader = CSVReader.open(Source.fromFile(getClass.getResource("/RailReferences.csv").getFile))
+      val csvReader = CSVReader.open(Source.fromFile(railReferencesPath))
       csvReader.allWithHeaders()
     }
 

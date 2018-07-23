@@ -13,6 +13,7 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.{HttpService, Uri}
 import redis.RedisClient
 import trainmapper.ActivationLookupConfig._
+import trainmapper.ServerConfig.ApplicationConfig
 import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
 import trainmapper.clients.{ActivationLookupClient, RailwaysCodesClient}
@@ -36,17 +37,18 @@ object MovementMessageHandler extends StrictLogging {
                  rabbitClient: RabbitClient[E],
                  httpClient: Client[IO],
                  railwaysCodesClient: RailwaysCodesClient,
-                 cacheExpiry: Option[FiniteDuration],
+                 appConfig: ApplicationConfig,
                  activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
     for {
       cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
       httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
       activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(activationLookupConfig.baseUri, httpClient)))
-      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient)))
+      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient, appConfig.railReferencesFilePath)))
     } yield
-      MovementMessageHandlerApp(httpService,
-                                startRabbit(rabbitClient, activationClient, stopReference, cache, cacheExpiry),
-                                cache)
+      MovementMessageHandlerApp(
+        httpService,
+        startRabbit(rabbitClient, activationClient, stopReference, cache, appConfig.movementExpiry),
+        cache)
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
@@ -86,7 +88,7 @@ object ActivationMessageHandlerMain extends App {
                                           rabbitClient,
                                           httpClient,
                                           railwayCodesClient,
-                                          Some(serverConfig.movementExpiry),
+                                          serverConfig,
                                           activationLookupConfig)
     _ <- startServer(app.httpService, serverConfig.port).concurrently {
       app.rabbit

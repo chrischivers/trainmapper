@@ -16,6 +16,7 @@ import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
+import trainmapper.ServerConfig.ApplicationConfig
 import trainmapper.Shared.{
   CRS,
   EventType,
@@ -45,6 +46,8 @@ class MovementMessageHandlerTest extends FlatSpec {
       .using(RabbitConfig.trainMovementsExchange.name)
       .using(RabbitConfig.movementRoutingKey)
       .using(MessageProperties.persistentBasic.copy(contentType = Some(ContentType("application/json"))))
+
+  val defaultApplicationConfig = ApplicationConfig(0, "", None, getClass.getResource("/RailReferences.csv").getFile)
 
   "Movement message handler" should "decode incoming movement message and push to list cache" in evaluateStream {
 
@@ -87,7 +90,7 @@ class MovementMessageHandlerTest extends FlatSpec {
                                             rabbitSimulator,
                                             httpClient,
                                             railwayCodesClient,
-                                            cacheExpiry = None,
+                                            defaultApplicationConfig,
                                             ActivationLookupConfig(Uri(path = "/")))
       _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
       _            <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
@@ -178,7 +181,7 @@ class MovementMessageHandlerTest extends FlatSpec {
                                             rabbitSimulator,
                                             httpClient,
                                             railwayCodesClient,
-                                            cacheExpiry = None,
+                                            defaultApplicationConfig,
                                             ActivationLookupConfig(Uri(path = "/")))
       _            <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
       _            <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage1)))
@@ -266,12 +269,14 @@ class MovementMessageHandlerTest extends FlatSpec {
       _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
       railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails.withoutLatLng))))
-      app <- MovementMessageHandler.appFrom(redisClient,
-                                            rabbitSimulator,
-                                            httpClient,
-                                            railwayCodesClient,
-                                            cacheExpiry = Some(cacheExpiry),
-                                            ActivationLookupConfig(Uri(path = "/")))
+      app <- MovementMessageHandler.appFrom(
+        redisClient,
+        rabbitSimulator,
+        httpClient,
+        railwayCodesClient,
+        defaultApplicationConfig.copy(movementExpiry = Some(cacheExpiry)),
+        ActivationLookupConfig(Uri(path = "/"))
+      )
       _             <- Stream.eval(IO.unit).concurrently(app.rabbit) //todo is there a better way?
       _             <- Stream.eval(rabbitSimulator.publish(movementPublishingConfig.toPublishCommand(incomingMessage)))
       _             <- Stream.eval(rabbitSimulator.waitForMessagesToBeProcessed())

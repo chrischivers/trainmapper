@@ -13,6 +13,7 @@ import org.http4s.client.Client
 import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
+import trainmapper.ServerConfig.ApplicationConfig
 import trainmapper._
 import trainmapper.Shared.{
   EventType,
@@ -95,12 +96,14 @@ class MovementHttpServiceTest extends FlatSpec {
       railwayCodesClient <- Stream.eval(
         IO(StubRailwayCodesClient(List(movementPacket1.stopReferenceDetails.get.withoutLatLng,
                                        movementPacket2.stopReferenceDetails.get.withoutLatLng))))
-      app <- MovementMessageHandler.appFrom(redisClient,
-                                            rabbitSimulator,
-                                            activationClient,
-                                            railwayCodesClient,
-                                            cacheExpiry = None,
-                                            ActivationLookupConfig(Uri(path = "/")))
+      app <- MovementMessageHandler.appFrom(
+        redisClient,
+        rabbitSimulator,
+        activationClient,
+        railwayCodesClient,
+        ApplicationConfig(0, "", None, getClass.getResource("/RailReferences.csv").getFile),
+        ActivationLookupConfig(Uri(path = "/"))
+      )
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket2)(expiry = None))
       http     <- Stream.eval(IO(Client.fromHttpService(app.httpService)))

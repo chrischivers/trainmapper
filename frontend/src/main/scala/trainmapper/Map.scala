@@ -32,9 +32,11 @@ object Map {
 
     def onMessage(msg: MessageEvent): Unit =
       parse(msg.data.toString).flatMap(_.as[MovementPacket]) match {
-        case Left(err) => console.error(s"Error decoding incoming event message $msg. Error [$err]")
+        case Left(err)     => console.error(s"Error decoding incoming event message $msg. Error [$err]")
         case Right(packet) =>
-          val newLatLng = new google.maps.LatLng(packet.latLng.lat, packet.latLng.lng)
+          //todo remove gets
+          val newLatLng = new google.maps.LatLng(packet.stopReferenceDetails.get.latLng.get.lat,
+                                                 packet.stopReferenceDetails.get.latLng.get.lng)
           activeTrains.get(packet.trainId) match {
             case Some(existingMarker) =>
               existingMarker.setPosition(newLatLng)

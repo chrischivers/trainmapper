@@ -25,6 +25,7 @@ import trainmapper.Shared.{
   ServiceCode,
   StanoxCode,
   StopReferenceDetails,
+  StopReferenceDetailsWithLatLng,
   TOC,
   TipLocCode,
   TrainId,
@@ -69,7 +70,11 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                         toc)
 
     val stopReferenceDetails =
-      StopReferenceDetails("Description", Some(CRS("Some CRS")), Some(TipLocCode("Some Tiploc")), Some(stanoxCode))
+      StopReferenceDetailsWithLatLng("Description",
+                                     Some(CRS("Some CRS")),
+                                     Some(TipLocCode("PENZNCE")),
+                                     Some(stanoxCode),
+                                     Some(LatLng(50.12168189395619, -5.53255300482739)))
 
     for {
       redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -77,7 +82,7 @@ class MovementMessageHandlerTest extends FlatSpec {
       rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails))))
+      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails.withoutLatLng))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,
@@ -99,7 +104,6 @@ class MovementMessageHandlerTest extends FlatSpec {
         Some(stanoxCode),
         Some(stopReferenceDetails),
         EventType.Arrival,
-        LatLng(0.0, 0.0),
         actualTimestamp,
         MovementPacket.timeStampToString(actualTimestamp),
         Some(actualTimestamp),
@@ -149,18 +153,27 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                          toc)
 
     val stopReferenceDetails1 =
-      StopReferenceDetails("Description1", Some(CRS("CRS1")), Some(TipLocCode("Tiploc1")), Some(stanoxCode1))
+      StopReferenceDetailsWithLatLng("Description1",
+                                     Some(CRS("CRS1")),
+                                     Some(TipLocCode("BRNSTPL")),
+                                     Some(stanoxCode1),
+                                     Some(LatLng(51.073974963033145, -4.063103514867923)))
 
     val stopReferenceDetails2 =
-      StopReferenceDetails("Description1", Some(CRS("CRS2")), Some(TipLocCode("Tiploc2")), Some(stanoxCode2))
+      StopReferenceDetailsWithLatLng("Description1",
+                                     Some(CRS("CRS2")),
+                                     Some(TipLocCode("FALMTHT")),
+                                     Some(stanoxCode2),
+                                     Some(LatLng(50.148347949691754, -5.064922346375948)))
 
     for {
-      redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient        <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails1, stopReferenceDetails2))))
+      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      httpClient      <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
+      railwayCodesClient <- Stream.eval(
+        IO(StubRailwayCodesClient(List(stopReferenceDetails1.withoutLatLng, stopReferenceDetails2.withoutLatLng))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,
@@ -184,7 +197,6 @@ class MovementMessageHandlerTest extends FlatSpec {
         Some(stanoxCode1),
         Some(stopReferenceDetails1),
         EventType.Arrival,
-        LatLng(0.0, 0.0),
         actualTimestamp1,
         MovementPacket.timeStampToString(actualTimestamp1),
         Some(actualTimestamp1),
@@ -202,7 +214,6 @@ class MovementMessageHandlerTest extends FlatSpec {
         Some(stanoxCode2),
         Some(stopReferenceDetails2),
         EventType.Departure,
-        LatLng(0.0, 0.0),
         actualTimestamp2,
         MovementPacket.timeStampToString(actualTimestamp2),
         Some(actualTimestamp2),
@@ -242,7 +253,11 @@ class MovementMessageHandlerTest extends FlatSpec {
                                                         toc)
 
     val stopReferenceDetails =
-      StopReferenceDetails("Description", Some(CRS("CRS")), Some(TipLocCode("Tiploc")), Some(stanoxCode))
+      StopReferenceDetailsWithLatLng("Description",
+                                     Some(CRS("CRS")),
+                                     Some(TipLocCode("Tiploc")),
+                                     Some(stanoxCode),
+                                     Some(LatLng(0.0, 0.0)))
 
     for {
       redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -250,7 +265,7 @@ class MovementMessageHandlerTest extends FlatSpec {
       rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
       _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       httpClient         <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(respondWith = Some(activationRecord)))))
-      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails))))
+      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(List(stopReferenceDetails.withoutLatLng))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             httpClient,

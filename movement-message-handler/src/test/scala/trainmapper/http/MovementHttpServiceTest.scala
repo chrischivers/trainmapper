@@ -22,6 +22,7 @@ import trainmapper.Shared.{
   ServiceCode,
   StanoxCode,
   StopReferenceDetails,
+  StopReferenceDetailsWithLatLng,
   TOC,
   TrainId,
   VariationStatus
@@ -50,9 +51,8 @@ class MovementHttpServiceTest extends FlatSpec {
       serviceCode,
       TOC("AA"),
       Some(stanoxCode1),
-      Some(StopReferenceDetails("description1", None, None, Some(stanoxCode1))),
+      Some(StopReferenceDetailsWithLatLng("description1", None, None, Some(stanoxCode1), Some(LatLng(0.0, 0.0)))),
       EventType.Arrival,
-      LatLng(0.0, 0.0),
       actualTimestamp1,
       MovementPacket.timeStampToString(actualTimestamp1),
       Some(actualTimestamp1),
@@ -68,9 +68,8 @@ class MovementHttpServiceTest extends FlatSpec {
       serviceCode,
       TOC("AA"),
       Some(stanoxCode2),
-      Some(StopReferenceDetails("description2", None, None, Some(stanoxCode2))),
+      Some(StopReferenceDetailsWithLatLng("description2", None, None, Some(stanoxCode2), Some(LatLng(0.0, 0.0)))),
       EventType.Departure,
-      LatLng(0.0, 0.0),
       actualTimestamp2,
       MovementPacket.timeStampToString(actualTimestamp2),
       Some(actualTimestamp2 + 60000),
@@ -94,8 +93,8 @@ class MovementHttpServiceTest extends FlatSpec {
       _                <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       activationClient <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(Some(activationRecord)))))
       railwayCodesClient <- Stream.eval(
-        IO(StubRailwayCodesClient(
-          List(movementPacket1.stopReferenceDetails.get, movementPacket2.stopReferenceDetails.get))))
+        IO(StubRailwayCodesClient(List(movementPacket1.stopReferenceDetails.get.withoutLatLng,
+                                       movementPacket2.stopReferenceDetails.get.withoutLatLng))))
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitSimulator,
                                             activationClient,

@@ -166,13 +166,39 @@ object Shared {
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
   }
 
+  trait StopReference {
+    def description: String
+    def crs: Option[CRS]
+    def tiploc: Option[TipLocCode]
+    def stanox: Option[StanoxCode]
+  }
+
   case class StopReferenceDetails(description: String,
                                   crs: Option[CRS],
                                   tiploc: Option[TipLocCode],
                                   stanox: Option[StanoxCode])
+      extends StopReference {
+    def withLatLng(latLng: Option[LatLng]) =
+      StopReferenceDetailsWithLatLng(this.description, this.crs, this.tiploc, this.stanox, latLng)
+  }
+
   object StopReferenceDetails {
     implicit val encoder = deriveEncoder[StopReferenceDetails]
     implicit val decoder = deriveDecoder[StopReferenceDetails]
+  }
+
+  case class StopReferenceDetailsWithLatLng(description: String,
+                                            crs: Option[CRS],
+                                            tiploc: Option[TipLocCode],
+                                            stanox: Option[StanoxCode],
+                                            latLng: Option[LatLng])
+      extends StopReference {
+    def withoutLatLng = StopReferenceDetails(this.description, this.crs, this.tiploc, this.stanox)
+  }
+
+  object StopReferenceDetailsWithLatLng {
+    implicit val encoder = deriveEncoder[StopReferenceDetailsWithLatLng]
+    implicit val decoder = deriveDecoder[StopReferenceDetailsWithLatLng]
   }
 
   case class ScheduleDetailRecord(sequence: Int,
@@ -193,9 +219,8 @@ object Shared {
                             serviceCode: ServiceCode,
                             toc: TOC,
                             stanoxCode: Option[StanoxCode],
-                            stopReferenceDetails: Option[StopReferenceDetails],
+                            stopReferenceDetails: Option[StopReferenceDetailsWithLatLng],
                             eventType: EventType,
-                            latLng: LatLng,
                             actualTimeStamp: Long,
                             actualTime: String,
                             plannedTimestamp: Option[Long],

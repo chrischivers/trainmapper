@@ -1,7 +1,7 @@
 package trainmapper
 import cats.effect.IO
 import clients.RailwaysCodesClient
-import trainmapper.Shared.StopReferenceDetails
+import trainmapper.Shared.{StopReferenceDetails, StopReferenceDetailsWithLatLng}
 
 object StubRailwayCodesClient {
 

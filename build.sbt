@@ -125,7 +125,8 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
       "com.github.etaty"           %% "rediscala"                % "1.8.0",
-      "net.ruippeixotog"          %% "scala-scraper"             % "2.1.0",
+      "net.ruippeixotog"           %% "scala-scraper"            % "2.1.0",
+      "com.github.tototoshi"       %% "scala-csv"                % "1.3.5",
       "io.circe" %% "circe-fs2" % circeVersion)
        ++ Seq (
       "com.itv"                    %% "bucky-core"               % buckyVersion,

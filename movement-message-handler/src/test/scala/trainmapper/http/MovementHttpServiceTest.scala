@@ -101,7 +101,7 @@ class MovementHttpServiceTest extends FlatSpec {
         rabbitSimulator,
         activationClient,
         railwayCodesClient,
-        ApplicationConfig(0, "", None, getClass.getResource("/RailReferences.csv").getFile),
+        ApplicationConfig(0, "", None),
         ActivationLookupConfig(Uri(path = "/"))
       )
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))

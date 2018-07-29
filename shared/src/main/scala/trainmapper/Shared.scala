@@ -1,15 +1,14 @@
 package trainmapper
 
-import java.time.{Instant, LocalTime, ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter
+import java.time.{Instant, LocalTime, ZoneId, ZonedDateTime}
 
-import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto._
+import io.circe.{Decoder, Encoder, Json}
 
 object Shared {
 
-  import io.circe.java8.time.decodeLocalTime
-  import io.circe.java8.time.encodeLocalTime
+  import io.circe.java8.time.{decodeLocalTime, encodeLocalTime}
 
   val timeFormatter = DateTimeFormatter.ofPattern("HHmm")
 
@@ -159,11 +158,20 @@ object Shared {
     implicit val encoder: Encoder[LocationType] = (a: LocationType) => Json.fromString(a.string)
   }
 
-  case class LatLng(lat: Double, lng: Double)
+  case class LatLng(lat: Double, lng: Double) {
+    def asQueryParameterString = s"${lat.toString},${lng.toString}"
+  }
 
   object LatLng {
     implicit val encoder: Encoder[LatLng] = deriveEncoder[LatLng]
     implicit val decoder: Decoder[LatLng] = deriveDecoder[LatLng]
+  }
+
+  case class Polyline(value: String)
+
+  object Polyline {
+    implicit val encoder: Encoder[Polyline] = deriveEncoder[Polyline]
+    implicit val decoder: Decoder[Polyline] = deriveDecoder[Polyline]
   }
 
   trait StopReference {
@@ -203,7 +211,6 @@ object Shared {
 
   case class ScheduleDetailRecord(sequence: Int,
                                   tipLocCode: TipLocCode,
-                                  stanoxCode: Option[StanoxCode],
                                   locationType: LocationType,
                                   scheduledArrivalTime: Option[LocalTime],
                                   scheduledDepartureTime: Option[LocalTime],

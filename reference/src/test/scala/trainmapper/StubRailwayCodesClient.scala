@@ -1,5 +1,4 @@
 package trainmapper
-
 import cats.effect.IO
 import trainmapper.Shared.StopReferenceDetails
 import trainmapper.clients.RailwaysCodesClient

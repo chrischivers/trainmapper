@@ -9,18 +9,14 @@ import scala.util.Try
 
 object ServerConfig {
 
-  case class ApplicationConfig(port: Int,
-                               googleMapsApiKey: String,
-                               movementExpiry: Option[FiniteDuration],
-                               railReferencesFilePath: String)
+  case class ApplicationConfig(port: Int, googleMapsApiKey: String, movementExpiry: Option[FiniteDuration])
 
   def read: ApplicationConfig = {
     val config = ConfigFactory.load()
     ApplicationConfig(
       config.getInt("server.port"),
       config.getString("server.mapsApiKey"),
-      Try(FiniteDuration(config.getDuration("movementExpiry").toMillis, TimeUnit.MILLISECONDS)).toOption,
-      config.getString("server.railReferencesPath")
+      Try(FiniteDuration(config.getDuration("movementExpiry").toMillis, TimeUnit.MILLISECONDS)).toOption
     )
   }
 

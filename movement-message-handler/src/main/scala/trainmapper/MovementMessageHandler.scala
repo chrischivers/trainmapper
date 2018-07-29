@@ -43,7 +43,7 @@ object MovementMessageHandler extends StrictLogging {
       cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
       httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
       activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(activationLookupConfig.baseUri, httpClient)))
-      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient, appConfig.railReferencesFilePath)))
+      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient)))
     } yield
       MovementMessageHandlerApp(
         httpService,

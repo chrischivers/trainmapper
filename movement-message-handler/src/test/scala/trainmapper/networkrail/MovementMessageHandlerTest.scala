@@ -17,21 +17,7 @@ import org.scalatest.Matchers._
 import org.scalatest.{Assertion, FlatSpec}
 import trainmapper.ActivationLookupConfig.ActivationLookupConfig
 import trainmapper.ServerConfig.ApplicationConfig
-import trainmapper.Shared.{
-  CRS,
-  EventType,
-  LatLng,
-  MovementPacket,
-  ScheduleTrainId,
-  ServiceCode,
-  StanoxCode,
-  StopReferenceDetails,
-  StopReferenceDetailsWithLatLng,
-  TOC,
-  TipLocCode,
-  TrainId,
-  VariationStatus
-}
+import trainmapper.Shared._
 import trainmapper.StubHttpClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
 import trainmapper._
@@ -47,7 +33,7 @@ class MovementMessageHandlerTest extends FlatSpec {
       .using(RabbitConfig.movementRoutingKey)
       .using(MessageProperties.persistentBasic.copy(contentType = Some(ContentType("application/json"))))
 
-  val defaultApplicationConfig = ApplicationConfig(0, "", None, getClass.getResource("/RailReferences.csv").getFile)
+  val defaultApplicationConfig = ApplicationConfig(0, "", None)
 
   "Movement message handler" should "decode incoming movement message and push to list cache" in evaluateStream {
 
@@ -77,7 +63,7 @@ class MovementMessageHandlerTest extends FlatSpec {
                                      Some(CRS("Some CRS")),
                                      Some(TipLocCode("PENZNCE")),
                                      Some(stanoxCode),
-                                     Some(LatLng(50.12168189395619, -5.53255300482739)))
+                                     Some(LatLng(50.1225016380894, -5.531927740587754)))
 
     for {
       redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
@@ -160,14 +146,14 @@ class MovementMessageHandlerTest extends FlatSpec {
                                      Some(CRS("CRS1")),
                                      Some(TipLocCode("BRNSTPL")),
                                      Some(stanoxCode1),
-                                     Some(LatLng(51.073974963033145, -4.063103514867923)))
+                                     Some(LatLng(51.07332802922145, -4.06256082528753)))
 
     val stopReferenceDetails2 =
       StopReferenceDetailsWithLatLng("Description1",
                                      Some(CRS("CRS2")),
                                      Some(TipLocCode("FALMTHT")),
                                      Some(stanoxCode2),
-                                     Some(LatLng(50.148347949691754, -5.064922346375948)))
+                                     Some(LatLng(50.14833146498763, -5.0648652929940035)))
 
     for {
       redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))

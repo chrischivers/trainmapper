@@ -44,24 +44,50 @@ lazy val shared =
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js
 
-//lazy val scheduleLoader = (project in file("schedule-loader"))
-//  .settings(
-//    name := "trainmapper-schedule-loader"
-//  ) .settings(commonSettings)
-//  .settings(
-//    libraryDependencies ++= Seq(
-//      "com.typesafe"               % "config"                    % "1.3.3",
-//      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
-//      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
-//      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
-//      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
-//      "org.http4s"                 %% "http4s-blaze-server"      % http4sVersion,
-//      "org.http4s"                 %% "http4s-blaze-client"      % http4sVersion,
-//      "org.http4s"                 %% "http4s-circe"             % http4sVersion,
-//      "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
-//      "net.ruippeixotog"          %% "scala-scraper"             % "2.1.0"),
-//    mainClass in (Compile, run) := Some("trainmapper.Main")
-//  ).dependsOn(sharedJvm)
+lazy val reference = (project in file("reference"))
+  .settings(
+    name := "trainmapper-reference"
+  ) .settings(commonSettings)
+  .settings(
+    resolvers ++= Seq(
+      "mygrid" at "http://www.mygrid.org.uk/maven/repository/"
+    ),
+    libraryDependencies ++= Seq(
+      "com.typesafe"               % "config"                    % "1.3.3",
+      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
+      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
+      "net.ruippeixotog"           %% "scala-scraper"            % "2.1.0",
+      "com.github.tototoshi"       %% "scala-csv"                % "1.3.5",
+      "org.typelevel" %% "cats-effect" % "0.10.1",
+      "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0")
+  ).dependsOn(sharedJvm)
+
+lazy val scheduleLoader = (project in file("schedule-loader"))
+  .settings(
+    name := "trainmapper-schedule-loader"
+  ) .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe"               % "config"                    % "1.3.3",
+      "org.scalatest"              %% "scalatest"                % "3.0.1" % "test",
+      "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
+      "ch.qos.logback"             % "logback-classic"           % "1.1.5",
+      "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
+      "org.http4s"                 %% "http4s-blaze-server"      % http4sVersion,
+      "org.http4s"                 %% "http4s-blaze-client"      % http4sVersion,
+      "org.http4s"                 %% "http4s-circe"             % http4sVersion,
+      "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
+      "org.tpolecat"               %% "doobie-core"             % doobieVersion,
+      "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
+      "org.tpolecat"               %% "doobie-postgres"         % doobieVersion,
+      "org.tpolecat"               %% "doobie-scalatest"        % doobieVersion % "test",
+      "org.tpolecat"               %% "doobie-h2"               % doobieVersion % "test",
+      "org.flywaydb"               % "flyway-core" % "5.1.1",
+      "io.circe"                    %% "circe-fs2" % circeVersion),
+    mainClass in (Compile, run) := Some("trainmapper.Main")
+  ).dependsOn(sharedJvm, reference)
 
 lazy val backendMessageReceiver = (project in file("message-receiver"))
   .settings(
@@ -114,19 +140,13 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
   )
   .settings(commonSettings)
   .settings(
-    resolvers ++= Seq(
-      "mygrid" at "http://www.mygrid.org.uk/maven/repository/"
-    ),
     libraryDependencies ++= Seq(
-      "uk.org.mygrid.resources.jcoord" % "jcoord" % "1.0",
       "com.typesafe" % "config" % "1.3.3",
       "org.scalatest" %% "scalatest" % "3.0.1" % "test",
       "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
       "com.github.etaty"           %% "rediscala"                % "1.8.0",
-      "net.ruippeixotog"           %% "scala-scraper"            % "2.1.0",
-      "com.github.tototoshi"       %% "scala-csv"                % "1.3.5",
       "io.circe" %% "circe-fs2" % circeVersion)
        ++ Seq (
       "com.itv"                    %% "bucky-core"               % buckyVersion,
@@ -150,7 +170,7 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
     watchSources ++= (watchSources in frontend).value,
     mainClass in reStart := Some("trainmapper.ActivationMessageHandlerMain")
   )
-  .dependsOn(sharedJvm)
+  .dependsOn(sharedJvm, reference)
 
 lazy val frontend = (project in file("frontend"))
   .settings(

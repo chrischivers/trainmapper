@@ -1,5 +1,7 @@
 package trainmapper.http
 
+import java.util.UUID
+
 import cats.effect.IO
 import com.itv.bucky.decl.DeclarationExecutor
 import com.itv.bucky.ext.{fs2 => extRabbitFs2}
@@ -28,7 +30,7 @@ import trainmapper.Shared.{
   TrainId,
   VariationStatus
 }
-import trainmapper.StubHttpClient.TrainActivationMessage
+import trainmapper.StubActivationLookupClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
 
 class MovementHttpServiceTest extends FlatSpec {
@@ -88,11 +90,12 @@ class MovementHttpServiceTest extends FlatSpec {
                                                   System.currentTimeMillis() - 600000)
 
     for {
-      redisCacheRef    <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient      <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator  <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _                <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      activationClient <- Stream.eval(IO(Client.fromHttpService(StubHttpClient(Some(activationRecord)))))
+      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      activationClient <- Stream.eval(
+        IO(Client.fromHttpService(StubActivationLookupClient(Map(expectedTrainId -> activationRecord)))))
       railwayCodesClient <- Stream.eval(
         IO(StubRailwayCodesClient(List(movementPacket1.stopReferenceDetails.get.withoutLatLng,
                                        movementPacket2.stopReferenceDetails.get.withoutLatLng))))
@@ -102,6 +105,7 @@ class MovementHttpServiceTest extends FlatSpec {
         activationClient,
         railwayCodesClient,
         ApplicationConfig(0, "", None),
+        h2DatabaseConfig,
         ActivationLookupConfig(Uri(path = "/"))
       )
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
@@ -114,4 +118,10 @@ class MovementHttpServiceTest extends FlatSpec {
   }
 
   def evaluateStream[T](f: Stream[IO, Assertion]) = f.compile.drain.unsafeRunSync()
+
+  val h2DatabaseConfig =
+    DatabaseConfig("org.h2.Driver",
+                   s"jdbc:h2:mem:${UUID.randomUUID()};DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
+                   "",
+                   "")
 }

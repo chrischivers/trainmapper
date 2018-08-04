@@ -1,28 +1,57 @@
 package trainmapper.clients
-import java.time.temporal.TemporalAdjusters
-import java.time.{DayOfWeek, LocalDateTime, ZoneOffset}
+import java.time._
+import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 
 import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
+import org.http4s.EntityDecoder
 import org.http4s.circe.jsonOf
 import org.http4s.client.Client
-import org.http4s.{EntityDecoder, Uri}
 import trainmapper.DirectionsApiConfig
-import trainmapper.Shared.{LatLng, Polyline}
+import trainmapper.Shared.{DaysRun, LatLng, Polyline}
 
 trait DirectionsApi {
-
-  def trainPolylineFor(from: LatLng, to: LatLng): IO[Option[Polyline]]
-
+  def trainPolylineFor(from: LatLng,
+                       to: LatLng,
+                       departureTime: LocalTime,
+                       daysRun: DaysRun,
+                       scheduleStart: LocalDate,
+                       scheduleEnd: LocalDate): IO[Option[Polyline]]
 }
 
 object DirectionsApi extends StrictLogging {
 
   def apply(config: DirectionsApiConfig, client: Client[IO]) = new DirectionsApi {
 
-    override def trainPolylineFor(from: LatLng, to: LatLng): IO[Option[Polyline]] = {
+    val NumberOfAttempts = 4
 
-      logger.info(s"Attempting to retrieve polyline from $from to $to")
+    def generateReasonableDepartureTime(time: LocalTime,
+                                        daysRun: DaysRun,
+                                        scheduleStart: LocalDate,
+                                        scheduleEnd: LocalDate) = {
+      val now = LocalDate.now()
+      val departureDate: LocalDate = {
+        val isNotPast = if (scheduleStart.isBefore(now)) now else scheduleStart
+        val isNotOnDaysRun =
+          if (!daysRun.toDaysOfWeek.contains(isNotPast.getDayOfWeek))
+            isNotPast.`with`(TemporalAdjusters.next(daysRun.toDaysOfWeek.head))
+          else isNotPast
+        val isNotAfterEndDate =
+          if (scheduleEnd.isBefore(isNotOnDaysRun))
+            now.`with`(TemporalAdjusters.next(daysRun.toDaysOfWeek.head))
+          else isNotOnDaysRun
+        isNotAfterEndDate
+      }
+      val departureTime = time.minusMinutes(5)
+      LocalDateTime.of(departureDate, departureTime).atZone(ZoneId.of("Europe/London")).toEpochSecond
+    }
+
+    override def trainPolylineFor(from: LatLng,
+                                  to: LatLng,
+                                  departureTime: LocalTime,
+                                  daysRun: DaysRun,
+                                  scheduleStart: LocalDate,
+                                  scheduleEnd: LocalDate): IO[Option[Polyline]] = {
 
       import _root_.io.circe.generic.auto._
 
@@ -34,24 +63,16 @@ object DirectionsApi extends StrictLogging {
 
       implicit val entityDecoder: EntityDecoder[IO, DirectionsApiResponse] = jsonOf[IO, DirectionsApiResponse]
 
-      val fixedDepartureTime = LocalDateTime
-        .now()
-        .`with`(TemporalAdjusters.next(DayOfWeek.MONDAY))
-        .withHour(9)
-        .withMinute(0)
-        .withSecond(0)
-        .toEpochSecond(ZoneOffset.UTC)
-
       val uri = config.baseUri / "json" +?
         ("key", config.apiKey) +?
         ("origin", from.asQueryParameterString) +?
         ("destination", to.asQueryParameterString) +?
-        ("departure_time", fixedDepartureTime.toString) +?
+        ("departure_time", generateReasonableDepartureTime(departureTime, daysRun, scheduleStart, scheduleEnd).toString) +?
         ("mode", "transit") +?
         ("transit_mode", "train") +?
         ("transit_routing_preference", "fewer_transfers")
 
-      logger.debug(s"Using uri ${uri.renderString} to look up directions")
+      logger.info(s"Attempting to retrieve polyline from $from to $to using url $uri")
 
       client.expect[DirectionsApiResponse](uri).map { response =>
         for {

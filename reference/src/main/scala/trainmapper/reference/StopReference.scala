@@ -17,6 +17,11 @@ trait StopReference {
 
 object StopReference extends StrictLogging {
 
+  private val ManualLatLngMappings: Map[TipLocCode, LatLng] = Map(
+    TipLocCode("ANGMRNG") -> LatLng(50.8162376, -0.4898823),
+    TipLocCode("PHBR")    -> LatLng(50.796961, -1.107840)
+  )
+
   def apply(railwaysCodesClient: RailwaysCodesClient,
             EastingsNorthingsFile: String = "TIPLOC-Eastings-and-Northings.csv") =
     new StopReference {
@@ -28,10 +33,9 @@ object StopReference extends StrictLogging {
       }
 
       override lazy val allReferenceDetails: List[StopReferenceDetailsWithLatLng] = {
-        railwaysCodesClient
-          .parseAllCodes()
-          .map(_.map(ref => ref.withLatLng(ref.tiploc.flatMap(latLngFor))))
-          .unsafeRunSync()
+        val parsedCodes = railwaysCodesClient.parseAllCodes().unsafeRunSync()
+        logger.info(s"${parsedCodes.size} railway codes parsed")
+        parsedCodes.map(ref => ref.withLatLng(ref.tiploc.flatMap(latLngFor)))
       }
 
       override def referenceDetailsFor(stanoxCode: StanoxCode): Option[StopReferenceDetailsWithLatLng] =
@@ -41,12 +45,15 @@ object StopReference extends StrictLogging {
         allReferenceDetails.find(_.tiploc.contains(tipLocCode))
 
       private def latLngFor(tipLocCode: TipLocCode): Option[LatLng] =
-        for {
-          rowMap   <- railReferencesCSV.find(_.get("TIPLOC").contains(tipLocCode.value))
-          easting  <- rowMap.get("EASTING").flatMap(safeToInt)
-          northing <- rowMap.get("NORTHING").flatMap(safeToInt)
-          latLng   <- latLngFromEastingNorthing(easting, northing)
-        } yield latLng
+        ManualLatLngMappings.get(tipLocCode).orElse {
+          for {
+
+            rowMap   <- railReferencesCSV.find(_.get("TIPLOC").contains(tipLocCode.value))
+            easting  <- rowMap.get("EASTING").flatMap(safeToInt)
+            northing <- rowMap.get("NORTHING").flatMap(safeToInt)
+            latLng   <- latLngFromEastingNorthing(easting, northing)
+          } yield latLng
+        }
 
       private def safeToInt(str: String) = Try(str.toInt).toOption
 

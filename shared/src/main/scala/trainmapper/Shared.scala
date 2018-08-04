@@ -1,7 +1,7 @@
 package trainmapper
 
 import java.time.format.DateTimeFormatter
-import java.time.{Instant, LocalTime, ZoneId, ZonedDateTime}
+import java.time._
 
 import io.circe.generic.semiauto._
 import io.circe.{Decoder, Encoder, Json}
@@ -30,6 +30,13 @@ object Shared {
   object ServiceCode {
     implicit val decoder: Decoder[ServiceCode] = Decoder.decodeString.map(ServiceCode(_))
     implicit val encoder: Encoder[ServiceCode] = Encoder[ServiceCode](a => Json.fromString(a.value))
+  }
+
+  case class TrainCategory(value: String)
+
+  object TrainCategory {
+    implicit val decoder: Decoder[TrainCategory] = Decoder.decodeString.map(TrainCategory(_))
+    implicit val encoder: Encoder[TrainCategory] = Encoder[TrainCategory](a => Json.fromString(a.value))
   }
 
   case class ScheduleTrainId(value: String)
@@ -90,7 +97,10 @@ object Shared {
     implicit val encoder: Encoder[TipLocCode] = Encoder[TipLocCode](a => Json.fromString(a.value))
   }
 
-  case class DaysRun(value: String)
+  case class DaysRun(value: String) {
+    def toDaysOfWeek =
+      value.toList.zipWithIndex.collect { case (char, i) if char == '1' => DayOfWeek.of(i + 1) }
+  }
 
   object DaysRun {
 

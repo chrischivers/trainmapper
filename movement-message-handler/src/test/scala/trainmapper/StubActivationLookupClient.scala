@@ -8,7 +8,7 @@ import org.http4s.circe._
 import org.http4s.dsl.io._
 import trainmapper.Shared.{ScheduleTrainId, ServiceCode, StanoxCode, TrainId}
 
-object StubHttpClient extends StrictLogging {
+object StubActivationLookupClient extends StrictLogging {
 
   import io.circe.generic.auto._
   case class TrainActivationMessage(scheduleTrainId: ScheduleTrainId,
@@ -17,9 +17,9 @@ object StubHttpClient extends StrictLogging {
                                     originStanox: StanoxCode,
                                     originDepartureTimestamp: Long)
 
-  def apply(respondWith: Option[TrainActivationMessage] = None) = HttpService[IO] {
+  def apply(respondWith: Map[TrainId, TrainActivationMessage] = Map.empty) = HttpService[IO] {
     case GET -> Root / "activation" / id =>
-      respondWith.fold(NotFound())(r => Ok(r.asJson))
+      respondWith.get(TrainId(id)).fold(NotFound())(r => Ok(r.asJson))
     case x =>
       logger.error(s"No path for request $x in http stub")
       NotFound()

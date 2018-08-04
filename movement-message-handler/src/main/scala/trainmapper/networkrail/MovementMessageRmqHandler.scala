@@ -4,21 +4,12 @@ import cats.effect.IO
 import com.itv.bucky.CirceSupport.unmarshallerFromDecodeJson
 import com.itv.bucky.{Ack, RequeueConsumeAction, RequeueHandler}
 import com.typesafe.scalalogging.StrictLogging
-import fs2.async.mutable.Queue
 import io.circe.HCursor
-import trainmapper.Shared.{
-  EventType,
-  LatLng,
-  MovementPacket,
-  ScheduleTrainId,
-  ServiceCode,
-  StanoxCode,
-  TOC,
-  TrainId,
-  VariationStatus
-}
+import trainmapper.Shared.{EventType, MovementPacket, ServiceCode, StanoxCode, TOC, TrainId, VariationStatus}
 import trainmapper.cache.ListCache
 import trainmapper.clients.ActivationLookupClient
+import trainmapper.db.ScheduleTable
+import trainmapper.db.ScheduleTable.ScheduleRecord
 import trainmapper.reference.StopReference
 
 import scala.concurrent.duration.FiniteDuration
@@ -83,12 +74,15 @@ object MovementMessageRmqHandler extends StrictLogging {
 
   def apply(activationLookupClient: ActivationLookupClient,
             stopReference: StopReference,
+            scheduleTable: ScheduleTable,
             cache: ListCache[TrainId, MovementPacket],
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
       override def apply(msg: TrainMovementMessage): IO[RequeueConsumeAction] =
         for {
           activationRecord <- activationLookupClient.fetch(msg.trainId)
+          scheduleRecord <- activationRecord.fold(IO.pure(List.empty[ScheduleRecord]))(activation =>
+            scheduleTable.scheduleFor(activation.scheduleTrainId))
           movementPacketOpt = activationRecord.map(
             activation =>
               MovementPacket(
@@ -106,7 +100,7 @@ object MovementMessageRmqHandler extends StrictLogging {
                 msg.plannedPassengerTimestamp,
                 msg.plannedPassengerTimestamp.map(MovementPacket.timeStampToString),
                 msg.variationStatus,
-                List.empty
+                scheduleRecord.map(_.toScheduleDetailsRecord)
             ))
           _ <- movementPacketOpt.fold {
             IO(logger.info(s"No activation record found for train Id ${msg.trainId.value}"))

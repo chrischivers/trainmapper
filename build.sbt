@@ -75,19 +75,12 @@ lazy val scheduleLoader = (project in file("schedule-loader"))
       "net.logstash.logback"       % "logstash-logback-encoder"  % "4.6",
       "ch.qos.logback"             % "logback-classic"           % "1.1.5",
       "com.typesafe.scala-logging" %% "scala-logging"            % "3.5.0",
-      "org.http4s"                 %% "http4s-blaze-server"      % http4sVersion,
       "org.http4s"                 %% "http4s-blaze-client"      % http4sVersion,
       "org.http4s"                 %% "http4s-circe"             % http4sVersion,
       "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
-      "org.tpolecat"               %% "doobie-core"             % doobieVersion,
-      "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
-      "org.tpolecat"               %% "doobie-postgres"         % doobieVersion,
-      "org.tpolecat"               %% "doobie-scalatest"        % doobieVersion % "test",
-      "org.tpolecat"               %% "doobie-h2"               % doobieVersion % "test",
-      "org.flywaydb"               % "flyway-core" % "5.1.1",
       "io.circe"                    %% "circe-fs2" % circeVersion),
     mainClass in (Compile, run) := Some("trainmapper.Main")
-  ).dependsOn(sharedJvm, reference)
+  ).dependsOn(movementMessageHandler, sharedJvm, reference)
 
 lazy val backendMessageReceiver = (project in file("message-receiver"))
   .settings(
@@ -153,7 +146,13 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
       "com.itv"                    %% "bucky-rabbitmq"           % buckyVersion,
       "com.itv"                    %% "bucky-fs2"                % buckyVersion,
       "com.itv"                    %% "bucky-circe"              % buckyVersion,
-      "com.itv"                    %% "bucky-test"               % buckyVersion  % "test"
+      "com.itv"                    %% "bucky-test"               % buckyVersion  % "test",
+      "org.tpolecat"               %% "doobie-core"             % doobieVersion,
+      "org.tpolecat"               %% "doobie-hikari"           % doobieVersion,
+      "org.tpolecat"               %% "doobie-postgres"         % doobieVersion,
+      "org.tpolecat"               %% "doobie-scalatest"        % doobieVersion % "test",
+      "org.tpolecat"               %% "doobie-h2"               % doobieVersion % "test",
+      "org.flywaydb"               % "flyway-core" % "5.1.1"
     )
       ++ Seq(
         "org.http4s"     %% "http4s-circe",

@@ -6,6 +6,8 @@ import com.itv.bucky.Monad.Id
 import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.{AmqpClient, fs2 => rabbitfs2}
 import com.typesafe.scalalogging.StrictLogging
+import doobie.hikari.HikariTransactor
+import doobie.hikari.syntax.HikariTransactorOps
 import fs2.Stream
 import org.http4s.client.Client
 import org.http4s.client.blaze.Http1Client
@@ -17,6 +19,7 @@ import trainmapper.ServerConfig.ApplicationConfig
 import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
 import trainmapper.clients.{ActivationLookupClient, RailwaysCodesClient}
+import trainmapper.db.ScheduleTable
 import trainmapper.http.MovementsHttp
 import trainmapper.networkrail.MovementMessageRmqHandler
 import trainmapper.networkrail.MovementMessageRmqHandler.TrainMovementMessage
@@ -30,7 +33,8 @@ object MovementMessageHandler extends StrictLogging {
   type RabbitClient[E] = AmqpClient[Id, IO, E, fs2.Stream[IO, Unit]]
 
   case class MovementMessageHandlerApp(httpService: HttpService[IO],
-                                       rabbit: fs2.Stream[IO, Unit],
+                                       rabbitStream: fs2.Stream[IO, Unit],
+                                       database: HikariTransactor[IO],
                                        cache: ListCache[TrainId, MovementPacket])
 
   def appFrom[E](redisClient: RedisClient,
@@ -38,27 +42,34 @@ object MovementMessageHandler extends StrictLogging {
                  httpClient: Client[IO],
                  railwaysCodesClient: RailwaysCodesClient,
                  appConfig: ApplicationConfig,
+                 databaseConfig: DatabaseConfig,
                  activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
-    for {
-      cache            <- fs2.Stream.eval(IO(MovementPacketCache(redisClient)))
-      httpService      <- fs2.Stream.eval(IO(MovementsHttp(cache)))
-      activationClient <- fs2.Stream.eval(IO(ActivationLookupClient(activationLookupConfig.baseUri, httpClient)))
-      stopReference    <- fs2.Stream.eval(IO(StopReference(railwaysCodesClient)))
-    } yield
-      MovementMessageHandlerApp(
-        httpService,
-        startRabbit(rabbitClient, activationClient, stopReference, cache, appConfig.movementExpiry),
-        cache)
+    db.withTransactor(databaseConfig)() { dbTransactor =>
+      for {
+        cache            <- fs2.Stream.emit(MovementPacketCache(redisClient))
+        httpService      <- fs2.Stream.emit(MovementsHttp(cache))
+        activationClient <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
+        stopReference    <- fs2.Stream.emit(StopReference(railwaysCodesClient))
+        scheduleTable    <- fs2.Stream.emit(ScheduleTable(dbTransactor))
+      } yield
+        MovementMessageHandlerApp(
+          httpService,
+          startRabbit(rabbitClient, activationClient, scheduleTable, stopReference, cache, appConfig.movementExpiry),
+          dbTransactor,
+          cache)
+
+    }
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
+                             scheduleTable: ScheduleTable,
                              stopReference: StopReference,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient, stopReference, cache, cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient, stopReference, scheduleTable, cache, cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )
@@ -76,24 +87,27 @@ object ActivationMessageHandlerMain extends App {
       .mountService(service)
       .serve
 
-  val app = for {
-    serverConfig           <- fs2.Stream.eval(IO(ServerConfig.read))
-    activationLookupConfig <- fs2.Stream.eval(IO(ActivationLookupConfig.read))
-    rabbitConfig           <- fs2.Stream.eval(IO(RabbitConfig.read))
-    rabbitClient           <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
-    redisClient            <- fs2.Stream.eval(IO(RedisClient()))
-    httpClient             <- Http1Client.stream[IO]()
-    railwayCodesClient     <- fs2.Stream.eval(IO(RailwaysCodesClient()))
-    app <- MovementMessageHandler.appFrom(redisClient,
-                                          rabbitClient,
-                                          httpClient,
-                                          railwayCodesClient,
-                                          serverConfig,
-                                          activationLookupConfig)
-    _ <- startServer(app.httpService, serverConfig.port).concurrently {
-      app.rabbit
-    }
-  } yield ()
+  val app =
+    for {
+      serverConfig           <- fs2.Stream.emit(ServerConfig.read)
+      databaseConfig         <- fs2.Stream.emit(DatabaseConfig.read)
+      activationLookupConfig <- fs2.Stream.emit(ActivationLookupConfig.read)
+      rabbitConfig           <- fs2.Stream.emit(RabbitConfig.read)
+      rabbitClient           <- rabbitfs2.clientFrom(rabbitConfig, RabbitConfig.declarations)
+      redisClient            <- fs2.Stream.emit(RedisClient())
+      httpClient             <- Http1Client.stream[IO]()
+      railwayCodesClient     <- fs2.Stream.emit(RailwaysCodesClient())
+      app <- MovementMessageHandler.appFrom(redisClient,
+                                            rabbitClient,
+                                            httpClient,
+                                            railwayCodesClient,
+                                            serverConfig,
+                                            databaseConfig,
+                                            activationLookupConfig)
+      _ <- startServer(app.httpService, serverConfig.port).concurrently {
+        app.rabbitStream
+      }
+    } yield ()
 
   app.compile.drain.unsafeRunSync()
 

@@ -1,0 +1,2 @@
+package trainmapper
+object StubDirectionsApiClient {}

@@ -43,7 +43,7 @@ object DirectionsApi extends StrictLogging {
         isNotAfterEndDate
       }
       val departureTime = time.minusMinutes(5)
-      LocalDateTime.of(departureDate, departureTime).atZone(ZoneId.of("Europe/London")).toEpochSecond
+      LocalDateTime.of(departureDate, departureTime).toEpochSecond(ZoneOffset.UTC)
     }
 
     override def trainPolylineFor(from: LatLng,

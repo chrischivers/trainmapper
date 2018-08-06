@@ -14,6 +14,7 @@ import trainmapper.db.ScheduleTable.ScheduleRecord
 trait ScheduleTable extends Table[ScheduleRecord] {
   def scheduleFor(scheduleTrainId: ScheduleTrainId): IO[List[ScheduleRecord]]
   def allRecords: IO[List[ScheduleRecord]]
+  def deleteAllRecords: IO[Unit]
 }
 
 object ScheduleTable {
@@ -29,14 +30,15 @@ object ScheduleTable {
                             daysRun: DaysRun,
                             scheduleStart: LocalDate,
                             scheduleEnd: LocalDate,
-                            polylineIdToNext: Int) {
-    def toScheduleDetailsRecord =
+                            polylineIdToNext: Option[Int]) {
+    def toScheduleDetailsRecord(polyLineToNext: Option[Polyline]) =
       ScheduleDetailRecord(this.sequence,
                            this.tipLocCode,
                            this.locationType,
                            this.scheduledArrivalTime,
                            this.scheduledDepartureTime,
-                           this.daysRun)
+                           this.daysRun,
+                           polyLineToNext)
   }
 
   object ScheduleRecord {
@@ -64,7 +66,7 @@ object ScheduleTable {
                                daysRun: DaysRun,
                                scheduleStart: LocalDate,
                                scheduleEnd: LocalDate) {
-      def toScheduleRecord(polylineId: Int) =
+      def toScheduleRecord(polylineId: Option[Int]) =
         ScheduleRecord(
           None,
           scheduleTrainId,
@@ -112,6 +114,6 @@ object ScheduleTable {
         .query[ScheduleRecord]
         .to[List]
         .transact(db)
-
+    override def deleteAllRecords: IO[Unit] = sql"""DELETE FROM schedule""".update.run.transact(db).void
   }
 }

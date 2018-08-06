@@ -7,7 +7,7 @@ import java.time.{LocalDate, LocalTime}
 import cats.data.OptionT
 import cats.effect.IO
 import com.typesafe.scalalogging.StrictLogging
-import fs2.Pipe
+import fs2.{Pipe, Stream}
 import fs2.compress._
 import io.circe.Decoder.Result
 import io.circe.fs2._
@@ -29,7 +29,7 @@ import scala.collection.immutable.Queue
 
 trait ScheduleTablePopulator {
 
-  def populateTable(): IO[Unit]
+  def populateTable(limitTo: Option[List[ScheduleTrainId]] = None): IO[Unit]
 }
 
 object ScheduleTablePopulator extends StrictLogging {
@@ -53,6 +53,7 @@ object ScheduleTablePopulator extends StrictLogging {
   }
 
   case class DecodedScheduleRecord(CIF_train_uid: ScheduleTrainId,
+                                   CIF_stp_indicator: String,
                                    schedule_days_runs: DaysRun,
                                    schedule_start_date: LocalDate,
                                    schedule_end_date: LocalDate,
@@ -60,7 +61,7 @@ object ScheduleTablePopulator extends StrictLogging {
       extends DecodedRecord {
 
     def toScheduleRecordsWithoutPolyline: List[ScheduleRecord.WithoutPolyline] =
-      schedule_segment.schedule_location.zipWithIndex.map {
+      schedule_segment.schedule_location.getOrElse(List.empty).zipWithIndex.map {
         case (loc, sequence) =>
           ScheduleRecord.WithoutPolyline(
             CIF_train_uid,
@@ -89,7 +90,7 @@ object ScheduleTablePopulator extends StrictLogging {
 
     case class ScheduleSegment(CIF_train_service_code: ServiceCode,
                                CIF_train_category: TrainCategory,
-                               schedule_location: List[ScheduleLocation])
+                               schedule_location: Option[List[ScheduleLocation]])
     object ScheduleSegment {
       implicit val decoder: Decoder[ScheduleSegment] = deriveDecoder
 
@@ -115,13 +116,13 @@ object ScheduleTablePopulator extends StrictLogging {
 
     val credentials = BasicCredentials(config.username, config.password)
 
-    override def populateTable(): IO[Unit] =
+    override def populateTable(limitTo: Option[List[ScheduleTrainId]] = None): IO[Unit] =
       for {
         _ <- deleteTmpFiles()
         _ <- downloadFromUrl()
         _ <- unpackScheduleData()
         _ <- checkFileExists
-        lastRec <- readData.zipWithIndex
+        lastRec <- readData(limitTo).zipWithIndex
           .evalMap { case (rec, i) => scheduleTable.safeInsertRecord(rec).map(_ => i) }
           .compile
           .last
@@ -142,7 +143,7 @@ object ScheduleTablePopulator extends StrictLogging {
           .withHeaders(Headers(Authorization(credentials)))
         _ <- FollowRedirect(maxRedirects = 10)(client)
           .streaming(request) { resp =>
-            println("Response status: " + resp.status)
+            logger.info("Response status: " + resp.status)
             if (resp.status.isSuccess) {
               logger.info("Download of schedule response successful. Writing to file...")
               fs2.Stream.eval(writeToFile(tmpDownloadLocation, resp.body))
@@ -173,9 +174,9 @@ object ScheduleTablePopulator extends StrictLogging {
         .drain
         .flatMap(_ => IO(logger.info("Finished unpacking schedule data")))
 
-    def withPolyLine: Pipe[IO, Queue[ScheduleRecord.WithoutPolyline], ScheduleRecord] = _.evalMap { queue =>
+    def withPolyLine: Pipe[IO, Queue[Option[ScheduleRecord.WithoutPolyline]], ScheduleRecord] = _.evalMap { queue =>
       queue.toList match {
-        case from :: to :: Nil =>
+        case Some(from) :: Some(to) :: Nil =>
           for {
             existingPolylineId <- polylineTable.polylineIdFor(from.tipLocCode, to.tipLocCode)
             polylineId <- existingPolylineId.fold(
@@ -185,7 +186,8 @@ object ScheduleTablePopulator extends StrictLogging {
                                     from.daysRun,
                                     from.scheduleStart,
                                     from.scheduleEnd))(IO.pure)
-          } yield from.toScheduleRecord(polylineId)
+          } yield from.toScheduleRecord(Some(polylineId))
+        case Some(to) :: None :: Nil => IO(to.toScheduleRecord(None))
         case other =>
           IO.raiseError(new RuntimeException(s"Unexpected number of elements in sliding window. [$other]"))
       }
@@ -210,8 +212,8 @@ object ScheduleTablePopulator extends StrictLogging {
         polyLine <- OptionT(
           directionsApi.trainPolylineFor(fromLatLng, toLatLng, departureTime, daysRun, scheduleStart, scheduleEnd))
         _ = logger.info(s"Polyline obtained $polyLine")
-        insertedRecord <- OptionT.liftF(polylineTable.insertAndRetrieveInserted(from, to, polyLine))
-      } yield insertedRecord.id
+        insertedRecordId <- OptionT.liftF(polylineTable.insertAndRetrieveInsertedId(from, to, polyLine))
+      } yield insertedRecordId
       result.value
         .flatMap(
           _.fold(IO.raiseError[PolylineId](new RuntimeException("Error retrieving and writing polyline")))(IO.pure))
@@ -219,17 +221,20 @@ object ScheduleTablePopulator extends StrictLogging {
 
     private def isScheduleRecord(json: Json) = json.hcursor.downField("JsonScheduleV1").succeeded
 
-    private def isNotReplacementBus(decodedScheduleRecord: DecodedScheduleRecord) =
-      decodedScheduleRecord.schedule_segment.CIF_train_category.value != "BR"
+    private def isOrdinaryPassengerTrain(decodedScheduleRecord: DecodedScheduleRecord) =
+      TrainCategory.OrdinaryPassengerTrains.contains(decodedScheduleRecord.schedule_segment.CIF_train_category)
+
+    private def isPermanentSchedule(decodedScheduleRecord: DecodedScheduleRecord) =
+      decodedScheduleRecord.CIF_stp_indicator == "P"
 
     private def removePassingOnlyStations: Pipe[IO, DecodedScheduleRecord, DecodedScheduleRecord] = _.map { rec =>
       rec.copy(
         schedule_segment =
-          rec.schedule_segment.copy(schedule_location = rec.schedule_segment.schedule_location.filter(r =>
-            r.public_arrival.isDefined || r.public_departure.isDefined)))
+          rec.schedule_segment.copy(schedule_location = rec.schedule_segment.schedule_location.map(_.filter(r =>
+            r.public_arrival.isDefined || r.public_departure.isDefined))))
     }
 
-    private def readData: fs2.Stream[IO, ScheduleRecord] =
+    private def readData(limitTo: Option[List[ScheduleTrainId]] = None): fs2.Stream[IO, ScheduleRecord] =
       fs2.io.file
         .readAll[IO](tmpUnzipLocation, 4096)
         .through(fs2.text.utf8Decode)
@@ -239,13 +244,16 @@ object ScheduleTablePopulator extends StrictLogging {
         .filter(isScheduleRecord)
         .through(decoderPipe[DecodedRecord])
         .collect { case Right(decodedRecord: DecodedScheduleRecord) => decodedRecord }
-        .filter(isNotReplacementBus)
+        .filter(isOrdinaryPassengerTrain)
+        .filter(isPermanentSchedule)
         .through(removePassingOnlyStations)
+        .filter(record => limitTo.fold(true)(limitList => limitList.contains(record.CIF_train_uid)))
         .through(_.map(_.toScheduleRecordsWithoutPolyline))
         .flatMap(scheduleRecords =>
-          fs2.Stream.fromIterator[IO, ScheduleRecord.WithoutPolyline](scheduleRecords.toIterator).sliding(2))
+          fs2.Stream
+            .fromIterator[IO, Option[ScheduleRecord.WithoutPolyline]]((scheduleRecords.map(Some(_)) :+ None).toIterator)
+            .sliding(2))
         .through(withPolyLine)
-
   }
 
   def decoderPipe[A](implicit decode: Decoder[A]): Pipe[IO, Json, Decoder.Result[A]] =

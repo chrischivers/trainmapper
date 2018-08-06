@@ -33,7 +33,7 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
 
     val incomingMessage1 = TestData.createIncomingMovementMessageJson()
     val stanoxCode2      = StanoxCode("STANOX2")
-    val timestamp2       = TestData.defaultTimestamp + 60000
+    val timestamp2       = TestData.defaultMovementTimestamp + 60000
 
     val incomingMessage2 = TestData.createIncomingMovementMessageJson(stanoxCode = stanoxCode2,
                                                                       actualTimestamp = timestamp2,

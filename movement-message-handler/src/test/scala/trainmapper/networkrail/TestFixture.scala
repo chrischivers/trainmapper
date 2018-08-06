@@ -2,6 +2,8 @@ package trainmapper.networkrail
 import java.util.UUID
 
 import cats.effect.IO
+import cats.syntax.traverse._
+import cats.instances.list._
 import com.itv.bucky.CirceSupport.marshallerFromEncodeJson
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
 import com.itv.bucky.decl.DeclarationExecutor
@@ -23,6 +25,7 @@ import com.itv.bucky._
 import io.circe.Json
 import trainmapper.ServerConfig.ApplicationConfig
 import cats.syntax.functor._
+import trainmapper.db.ScheduleTable.ScheduleRecord
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -55,6 +58,7 @@ trait TestFixture {
 
   def withApp(activationRecords: Map[TrainId, TrainActivationMessage] = Map(
                 TestData.defaultActivationMessage.trainId -> TestData.defaultActivationMessage),
+              scheduleRecords: List[ScheduleRecord] = List(TestData.defaultScheduleRecord),
               stopReferenceDetails: List[StopReferenceDetailsWithLatLng] = List(TestData.defaultStopReferenceDetails),
               applicationConfig: ApplicationConfig = defaultApplicationConfig)(f: TestApp => IO[Assertion]) = {
 
@@ -72,13 +76,15 @@ trait TestFixture {
                                             applicationConfig,
                                             h2DatabaseConfig,
                                             ActivationLookupConfig(Uri(path = "/")))
+      _ <- Stream.eval(scheduleRecords.traverse[IO, Unit](rec => app.scheduleTable.safeInsertRecord(rec)))
       _ <- Stream.eval(IO.unit).concurrently(app.rabbitStream) //todo is there a better way?
+      testApp = TestApp(app, rabbitSimulator, redisCacheRef)
+      testResult <- Stream.eval(f(testApp).attempt)
+      _          <- Stream.eval(app.scheduleTable.deleteAllRecords)
 
-    } yield {
-      TestApp(app, rabbitSimulator, redisCacheRef)
-    }
+    } yield testResult.fold(err => throw err, identity)
 
-    result.evalMap(f).compile.drain.unsafeRunSync()
+    result.compile.drain.unsafeRunSync()
 
   }
 

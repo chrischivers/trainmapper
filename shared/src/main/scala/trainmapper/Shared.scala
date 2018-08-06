@@ -35,6 +35,7 @@ object Shared {
   case class TrainCategory(value: String)
 
   object TrainCategory {
+    val OrdinaryPassengerTrains                  = List("OL", "OU", "OO", "OS", "OW").map(TrainCategory(_))
     implicit val decoder: Decoder[TrainCategory] = Decoder.decodeString.map(TrainCategory(_))
     implicit val encoder: Encoder[TrainCategory] = Encoder[TrainCategory](a => Json.fromString(a.value))
   }
@@ -224,7 +225,8 @@ object Shared {
                                   locationType: LocationType,
                                   scheduledArrivalTime: Option[LocalTime],
                                   scheduledDepartureTime: Option[LocalTime],
-                                  daysRun: DaysRun)
+                                  daysRun: DaysRun,
+                                  polyLineToNext: Option[Polyline])
 
   object ScheduleDetailRecord {
     implicit val encoder: Encoder[ScheduleDetailRecord] = deriveEncoder[ScheduleDetailRecord]
@@ -245,7 +247,7 @@ object Shared {
                             plannedPassengerTimestamp: Option[Long],
                             plannedPassengerTime: Option[String],
                             variationStatus: Option[VariationStatus],
-                            scheduleDetails: List[ScheduleDetailRecord])
+                            scheduleDetails: List[ScheduleDetailRecord]) {}
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]

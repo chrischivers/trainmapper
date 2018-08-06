@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS schedule (
   days_run VARCHAR(8) NOT NULL,
   schedule_start DATE NOT NULL,
   schedule_end DATE NOT NULL,
-  polyline_id INTEGER NOT NULL,
+  polyline_id INTEGER NULL,
   CONSTRAINT unique_cons_schedule UNIQUE(schedule_train_id, schedule_start, schedule_end, sequence)
 );
 

@@ -15,7 +15,8 @@ import trainmapper.db.PolylineTable.{PolylineRecord, ScheduleRecord}
 trait PolylineTable extends Table[PolylineRecord] {
   def polylineFor(fromTipLoc: TipLocCode, toTipLoc: TipLocCode): IO[Option[Polyline]]
   def polylineIdFor(fromTipLoc: TipLocCode, toTipLoc: TipLocCode): IO[Option[Int]]
-  def insertAndRetrieveInserted(fromTiploc: TipLocCode, toTiploc: TipLocCode, polyline: Polyline): IO[PolylineRecord]
+  def polyLineFor(id: Int): IO[Option[Polyline]]
+  def insertAndRetrieveInsertedId(fromTiploc: TipLocCode, toTiploc: TipLocCode, polyline: Polyline): IO[Int]
 }
 
 object PolylineTable {
@@ -38,7 +39,7 @@ object PolylineTable {
     private def insertFragment(fromTiploc: TipLocCode, toTiploc: TipLocCode, polyline: Polyline) = fr"""
       INSERT INTO polylines
       (from_tiploc_code, to_tiploc_code, polyline)
-      VALUES(${fromTiploc}, ${toTiploc}, ${polyline})
+      VALUES($fromTiploc, $toTiploc, $polyline)
      """
 
     override protected def insertRecord(record: PolylineRecord): IO[Unit] =
@@ -68,11 +69,21 @@ object PolylineTable {
         .option
         .transact(db)
 
-    override def insertAndRetrieveInserted(fromTiploc: TipLocCode,
-                                           toTiploc: TipLocCode,
-                                           polyline: Polyline): IO[PolylineRecord] =
+    override def insertAndRetrieveInsertedId(fromTiploc: TipLocCode,
+                                             toTiploc: TipLocCode,
+                                             polyline: Polyline): IO[Int] =
       insertFragment(fromTiploc, toTiploc, polyline).update
-        .withUniqueGeneratedKeys[PolylineRecord]("id", "from_tiploc_code", "to_tiploc_code", "polyline")
+        .withUniqueGeneratedKeys[Int]("id")
+        .transact(db)
+
+    override def polyLineFor(id: Int): IO[Option[Polyline]] =
+      sql"""
+      SELECT polyline
+      FROM polylines
+      WHERE id = ${id}
+      """
+        .query[Polyline]
+        .option
         .transact(db)
   }
 }

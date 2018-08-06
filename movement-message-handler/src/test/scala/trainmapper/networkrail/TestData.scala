@@ -1,11 +1,13 @@
 package trainmapper.networkrail
-import java.time.{Instant, LocalDateTime, ZoneId}
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
 
 import io.circe.parser.parse
 import trainmapper.Shared.{
   CRS,
+  DaysRun,
   EventType,
   LatLng,
+  LocationType,
   MovementPacket,
   ScheduleTrainId,
   ServiceCode,
@@ -17,6 +19,7 @@ import trainmapper.Shared.{
   VariationStatus
 }
 import trainmapper.StubActivationLookupClient.TrainActivationMessage
+import trainmapper.db.ScheduleTable.ScheduleRecord
 
 object TestData {
 
@@ -25,25 +28,42 @@ object TestData {
   val defaultServiceCode     = ServiceCode("AAAA")
   val defaultStanoxCode      = StanoxCode("YEHFJS")
   val defaultToc             = TOC("AA")
+  val defaultTiplocCode      = TipLocCode("PENZNCE")
 
-  val defaultTimestamp = LocalDateTime.of(2018, 8, 3, 20, 0, 0).atZone(ZoneId.of("UTC")).toInstant.toEpochMilli
+  val defaultMovementDateTime  = LocalDateTime.of(2018, 8, 3, 20, 0, 0)
+  val defaultMovementTimestamp = defaultMovementDateTime.toInstant(ZoneOffset.UTC).toEpochMilli
 
   val defaultActivationMessage = TrainActivationMessage(defaultScheduleTrainId,
                                                         defaultServiceCode,
                                                         defaultTrainId,
-                                                        StanoxCode("ORIGINSTANOX"),
-                                                        defaultTimestamp - 600000)
+                                                        defaultStanoxCode,
+                                                        defaultMovementTimestamp)
 
-  val defaultEventType = EventType.Arrival
+  val defaultEventType = EventType.Departure
 
   val defaultVariationStatus = VariationStatus.OnTime
 
   val defaultStopReferenceDetails =
     StopReferenceDetailsWithLatLng("Description",
                                    Some(CRS("Some CRS")),
-                                   Some(TipLocCode("PENZNCE")),
+                                   Some(defaultTiplocCode),
                                    Some(defaultStanoxCode),
                                    Some(LatLng(50.1225016380894, -5.531927740587754)))
+
+  val defaultScheduleRecord = ScheduleRecord(
+    None,
+    defaultScheduleTrainId,
+    1,
+    defaultServiceCode,
+    defaultTiplocCode,
+    LocationType.OriginatingLocation,
+    None,
+    Some(defaultMovementDateTime.toLocalTime),
+    DaysRun("1111100"),
+    defaultMovementDateTime.toLocalDate,
+    defaultMovementDateTime.toLocalDate.plusDays(1),
+    Some(1)
+  )
 
   val defaultMovementPacket = MovementPacket(
     defaultTrainId,
@@ -52,24 +72,24 @@ object TestData {
     defaultToc,
     Some(defaultStanoxCode),
     Some(defaultStopReferenceDetails),
-    EventType.Arrival,
-    defaultTimestamp,
-    MovementPacket.timeStampToString(defaultTimestamp),
-    Some(defaultTimestamp),
-    Some(MovementPacket.timeStampToString(defaultTimestamp)),
-    Some(defaultTimestamp),
-    Some(MovementPacket.timeStampToString(defaultTimestamp)),
+    defaultEventType,
+    defaultMovementTimestamp,
+    MovementPacket.timeStampToString(defaultMovementTimestamp),
+    Some(defaultMovementTimestamp),
+    Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
+    Some(defaultMovementTimestamp),
+    Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
     Some(VariationStatus.OnTime),
-    List.empty
+    List(defaultScheduleRecord.toScheduleDetailsRecord(None))
   )
 
   def createIncomingMovementMessageJson(trainId: TrainId = defaultTrainId,
-                                        actualTimestamp: Long = defaultTimestamp,
+                                        actualTimestamp: Long = defaultMovementTimestamp,
                                         serviceCode: ServiceCode = defaultServiceCode,
                                         stanoxCode: StanoxCode = defaultStanoxCode,
                                         eventType: EventType = defaultEventType,
-                                        plannedTimestamp: Long = defaultTimestamp,
-                                        plannedPassengerTimestamp: Long = defaultTimestamp,
+                                        plannedTimestamp: Long = defaultMovementTimestamp,
+                                        plannedPassengerTimestamp: Long = defaultMovementTimestamp,
                                         variationStatus: VariationStatus = defaultVariationStatus,
                                         toc: TOC = defaultToc) = {
     val str =

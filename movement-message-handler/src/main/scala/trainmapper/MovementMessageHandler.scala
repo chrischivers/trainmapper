@@ -19,7 +19,7 @@ import trainmapper.ServerConfig.ApplicationConfig
 import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
 import trainmapper.clients.{ActivationLookupClient, RailwaysCodesClient}
-import trainmapper.db.ScheduleTable
+import trainmapper.db.{PolylineTable, ScheduleTable}
 import trainmapper.http.MovementsHttp
 import trainmapper.networkrail.MovementMessageRmqHandler
 import trainmapper.networkrail.MovementMessageRmqHandler.TrainMovementMessage
@@ -34,7 +34,7 @@ object MovementMessageHandler extends StrictLogging {
 
   case class MovementMessageHandlerApp(httpService: HttpService[IO],
                                        rabbitStream: fs2.Stream[IO, Unit],
-                                       database: HikariTransactor[IO],
+                                       scheduleTable: ScheduleTable,
                                        cache: ListCache[TrainId, MovementPacket])
 
   def appFrom[E](redisClient: RedisClient,
@@ -51,25 +51,37 @@ object MovementMessageHandler extends StrictLogging {
         activationClient <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
         stopReference    <- fs2.Stream.emit(StopReference(railwaysCodesClient))
         scheduleTable    <- fs2.Stream.emit(ScheduleTable(dbTransactor))
+        polylineTable    <- fs2.Stream.emit(PolylineTable(dbTransactor))
       } yield
-        MovementMessageHandlerApp(
-          httpService,
-          startRabbit(rabbitClient, activationClient, scheduleTable, stopReference, cache, appConfig.movementExpiry),
-          dbTransactor,
-          cache)
+        MovementMessageHandlerApp(httpService,
+                                  startRabbit(rabbitClient,
+                                              activationClient,
+                                              scheduleTable,
+                                              polylineTable,
+                                              stopReference,
+                                              cache,
+                                              appConfig.movementExpiry),
+                                  scheduleTable,
+                                  cache)
 
     }
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
                              scheduleTable: ScheduleTable,
+                             polylineTable: PolylineTable,
                              stopReference: StopReference,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient, stopReference, scheduleTable, cache, cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient,
+                                  stopReference,
+                                  scheduleTable,
+                                  polylineTable,
+                                  cache,
+                                  cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )

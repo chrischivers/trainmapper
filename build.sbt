@@ -80,7 +80,7 @@ lazy val scheduleLoader = (project in file("schedule-loader"))
       "org.http4s"                 %% "http4s-dsl"               % http4sVersion,
       "com.h2database"             % "h2"                        % "1.4.197" % "test",
       "io.circe"                    %% "circe-fs2" % circeVersion),
-    mainClass in (Compile, run) := Some("trainmapper.Main")
+    mainClass in (Compile, run) := Some("trainmapper.PopulateScheduleTable")
   ).dependsOn(movementMessageHandler, sharedJvm, reference)
 
 lazy val backendMessageReceiver = (project in file("message-receiver"))

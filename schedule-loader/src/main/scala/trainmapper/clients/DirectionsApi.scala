@@ -29,7 +29,7 @@ object DirectionsApi extends StrictLogging {
                                         daysRun: DaysRun,
                                         scheduleStart: LocalDate,
                                         scheduleEnd: LocalDate) = {
-      val now = LocalDate.now()
+      val now = LocalDate.now().plusDays(1)
       val departureDate: LocalDate = {
         val isNotPast = if (scheduleStart.isBefore(now)) now else scheduleStart
         val isNotOnDaysRun =

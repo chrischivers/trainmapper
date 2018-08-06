@@ -19,7 +19,8 @@ object StopReference extends StrictLogging {
 
   private val ManualLatLngMappings: Map[TipLocCode, LatLng] = Map(
     TipLocCode("ANGMRNG") -> LatLng(50.8162376, -0.4898823),
-    TipLocCode("PHBR")    -> LatLng(50.796961, -1.107840)
+    TipLocCode("PHBR")    -> LatLng(50.796961, -1.107840),
+    TipLocCode("BATRSPK") -> LatLng(51.476958, -0.147533)
   )
 
   def apply(railwaysCodesClient: RailwaysCodesClient,

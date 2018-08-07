@@ -11,19 +11,21 @@ import trainmapper.DirectionsApiConfig
 import trainmapper.Shared.{DaysRun, LatLng, Polyline}
 
 trait DirectionsApi {
-  def trainPolylineFor(from: LatLng,
-                       to: LatLng,
-                       departureTime: LocalTime,
-                       daysRun: DaysRun,
-                       scheduleStart: LocalDate,
-                       scheduleEnd: LocalDate): IO[Option[Polyline]]
+  def trainPolylineFor(
+      from: LatLng,
+      to: LatLng,
+      departureTime: LocalTime,
+      daysRun: DaysRun,
+      scheduleStart: LocalDate,
+      scheduleEnd: LocalDate)(routingPreference: String = DirectionsApi.FewerTransfersRoutingPref): IO[Option[Polyline]]
 }
 
 object DirectionsApi extends StrictLogging {
 
-  def apply(config: DirectionsApiConfig, client: Client[IO]) = new DirectionsApi {
+  private val FewerTransfersRoutingPref = "fewer_transfers"
+  private val LessWalkingRoutingPref    = "less_walking"
 
-    val NumberOfAttempts = 4
+  def apply(config: DirectionsApiConfig, client: Client[IO]) = new DirectionsApi {
 
     def generateReasonableDepartureTime(time: LocalTime,
                                         daysRun: DaysRun,
@@ -43,15 +45,16 @@ object DirectionsApi extends StrictLogging {
         isNotAfterEndDate
       }
       val departureTime = time.minusMinutes(5)
-      LocalDateTime.of(departureDate, departureTime).toEpochSecond(ZoneOffset.UTC)
+      LocalDateTime.of(departureDate, departureTime).atZone(ZoneId.of("Europe/London")).toEpochSecond
     }
 
-    override def trainPolylineFor(from: LatLng,
-                                  to: LatLng,
-                                  departureTime: LocalTime,
-                                  daysRun: DaysRun,
-                                  scheduleStart: LocalDate,
-                                  scheduleEnd: LocalDate): IO[Option[Polyline]] = {
+    override def trainPolylineFor(
+        from: LatLng,
+        to: LatLng,
+        departureTime: LocalTime,
+        daysRun: DaysRun,
+        scheduleStart: LocalDate,
+        scheduleEnd: LocalDate)(routingPreference: String = FewerTransfersRoutingPref): IO[Option[Polyline]] = {
 
       import _root_.io.circe.generic.auto._
 
@@ -70,16 +73,21 @@ object DirectionsApi extends StrictLogging {
         ("departure_time", generateReasonableDepartureTime(departureTime, daysRun, scheduleStart, scheduleEnd).toString) +?
         ("mode", "transit") +?
         ("transit_mode", "train") +?
-        ("transit_routing_preference", "fewer_transfers")
+        ("transit_routing_preference", routingPreference)
 
       logger.info(s"Attempting to retrieve polyline from $from to $to using url $uri")
 
-      client.expect[DirectionsApiResponse](uri).map { response =>
+      val result = client.expect[DirectionsApiResponse](uri).map { response =>
         for {
           route <- response.routes.headOption
           leg   <- route.legs.headOption
           step  <- leg.steps.find(_.travel_mode == "TRANSIT")
         } yield Polyline(step.polyline.points)
+      }
+      result.flatMap { res =>
+        if (res.isEmpty && routingPreference == FewerTransfersRoutingPref)
+          trainPolylineFor(from, to, departureTime, daysRun, scheduleStart, scheduleEnd)(LessWalkingRoutingPref)
+        else IO.pure(res)
       }
     }
   }

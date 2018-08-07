@@ -71,10 +71,12 @@ object PolylineTable {
 
     override def insertAndRetrieveInsertedId(fromTiploc: TipLocCode,
                                              toTiploc: TipLocCode,
-                                             polyline: Polyline): IO[Int] =
+                                             polyline: Polyline): IO[Int] = {
+      logger.info(s"Inserting polyline from $fromTiploc to $toTiploc")
       insertFragment(fromTiploc, toTiploc, polyline).update
         .withUniqueGeneratedKeys[Int]("id")
         .transact(db)
+    }
 
     override def polyLineFor(id: Int): IO[Option[Polyline]] =
       sql"""

@@ -201,17 +201,17 @@ object ScheduleTablePopulator extends StrictLogging {
                                       daysRun: DaysRun,
                                       scheduleStart: LocalDate,
                                       scheduleEnd: LocalDate): IO[PolylineId] = {
-      logger.info(s"Geting polyline from tiploc ${from.value} to tiploc ${to.value}")
+      logger.info(s"Getting polyline from tiploc ${from.value} to tiploc ${to.value}")
       val result = for {
         fromReferenceDetails <- OptionT.fromOption[IO](stopReference.referenceDetailsFor(from))
-        _ = logger.info(s"From reference details $fromReferenceDetails")
-        toReferenceDetails <- OptionT.fromOption[IO](stopReference.referenceDetailsFor(to))
-        _ = logger.info(s"To reference details $toReferenceDetails")
-        fromLatLng <- OptionT.fromOption[IO](fromReferenceDetails.latLng)
-        toLatLng   <- OptionT.fromOption[IO](toReferenceDetails.latLng)
+        _                    <- OptionT.liftF(IO(logger.info(s"From reference details $fromReferenceDetails")))
+        toReferenceDetails   <- OptionT.fromOption[IO](stopReference.referenceDetailsFor(to))
+        _                    <- OptionT.liftF(IO(logger.info(s"To reference details $toReferenceDetails")))
+        fromLatLng           <- OptionT.fromOption[IO](fromReferenceDetails.latLng)
+        toLatLng             <- OptionT.fromOption[IO](toReferenceDetails.latLng)
         polyLine <- OptionT(
-          directionsApi.trainPolylineFor(fromLatLng, toLatLng, departureTime, daysRun, scheduleStart, scheduleEnd))
-        _ = logger.info(s"Polyline obtained $polyLine")
+          directionsApi.trainPolylineFor(fromLatLng, toLatLng, departureTime, daysRun, scheduleStart, scheduleEnd)())
+        _                <- OptionT.liftF(IO(logger.info(s"Polyline obtained $polyLine")))
         insertedRecordId <- OptionT.liftF(polylineTable.insertAndRetrieveInsertedId(from, to, polyLine))
       } yield insertedRecordId
       result.value
@@ -253,6 +253,7 @@ object ScheduleTablePopulator extends StrictLogging {
           fs2.Stream
             .fromIterator[IO, Option[ScheduleRecord.WithoutPolyline]]((scheduleRecords.map(Some(_)) :+ None).toIterator)
             .sliding(2))
+        .observe1(x => IO(println(x)))
         .through(withPolyLine)
   }
 

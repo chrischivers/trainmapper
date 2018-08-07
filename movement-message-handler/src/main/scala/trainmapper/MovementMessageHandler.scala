@@ -88,7 +88,7 @@ object MovementMessageHandler extends StrictLogging {
 
 }
 
-object ActivationMessageHandlerMain extends App {
+object MovementMessageHandlerMain extends App {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val actorSystem = ActorSystem()

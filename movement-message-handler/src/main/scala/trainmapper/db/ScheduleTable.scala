@@ -101,6 +101,8 @@ object ScheduleTable {
       sql"""
       SELECT id, schedule_train_id, sequence, service_code, tiploc_code, location_type, scheduled_arrival_time, scheduled_departure_time, days_run, schedule_start, schedule_end, polyline_id
       FROM schedule
+      WHERE schedule_train_id = $scheduleTrainId
+      ORDER BY sequence
       """
         .query[ScheduleRecord]
         .to[List]

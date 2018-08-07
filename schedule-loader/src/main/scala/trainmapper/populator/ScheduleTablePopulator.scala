@@ -182,7 +182,7 @@ object ScheduleTablePopulator extends StrictLogging {
             polylineId <- existingPolylineId.fold(
               getPolylineAndPersist(from.tipLocCode,
                                     to.tipLocCode,
-                                    from.scheduledDepartureTime.get,
+                                    from.scheduledDepartureTime.getOrElse(from.scheduledArrivalTime.get),
                                     from.daysRun,
                                     from.scheduleStart,
                                     from.scheduleEnd))(IO.pure)

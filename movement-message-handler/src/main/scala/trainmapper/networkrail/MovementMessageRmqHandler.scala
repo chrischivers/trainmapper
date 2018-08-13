@@ -86,18 +86,12 @@ object MovementMessageRmqHandler extends StrictLogging {
 
   def apply(activationLookupClient: ActivationLookupClient,
             stopReference: StopReference,
-            scheduleTable: ScheduleTable,
-            polylineTable: PolylineTable,
             cache: ListCache[TrainId, MovementPacket],
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
       override def apply(msg: TrainMovementMessage): IO[RequeueConsumeAction] = {
         val result = for {
           activationRecord <- OptionT(activationLookupClient.fetch(msg.trainId))
-          scheduleRecord   <- OptionT.liftF(scheduleTable.scheduleFor(activationRecord.scheduleTrainId))
-          scheduleDetailsRecords <- OptionT.liftF(scheduleRecord.traverse[IO, ScheduleDetailRecord](rec =>
-            rec.polylineIdToNext.fold(IO(rec.toScheduleDetailsRecord(None)))(idToNext =>
-              polylineTable.polyLineFor(idToNext).map(polyLine => rec.toScheduleDetailsRecord(polyLine)))))
           movementPacket = MovementPacket(
             msg.trainId,
             activationRecord.scheduleTrainId,
@@ -112,8 +106,7 @@ object MovementMessageRmqHandler extends StrictLogging {
             msg.plannedTimestamp.map(MovementPacket.timeStampToString),
             msg.plannedPassengerTimestamp,
             msg.plannedPassengerTimestamp.map(MovementPacket.timeStampToString),
-            msg.variationStatus,
-            scheduleDetailsRecords
+            msg.variationStatus
           )
           _ <- OptionT.liftF(cache.push(msg.trainId, movementPacket)(cacheExpiry))
         } yield ()

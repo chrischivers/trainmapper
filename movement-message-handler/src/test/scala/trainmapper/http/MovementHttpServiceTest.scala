@@ -32,14 +32,17 @@ import trainmapper.Shared.{
 }
 import trainmapper.StubActivationLookupClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
+import trainmapper.db.ScheduleTable.ScheduleRecord
+import trainmapper.http.MovementsHttp.MovementsPayload
+import trainmapper.networkrail.TestData
 
 class MovementHttpServiceTest extends FlatSpec {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val futureMonad   = future.futureMonad
-  implicit val entityDecoder = jsonOf[IO, List[MovementPacket]]
+  implicit val entityDecoder = jsonOf[IO, MovementsPayload]
 
-  "Movement message service" should "query cache by train ID returning list of train movements" in evaluateStream {
+  "Movement message service" should "query cache by train ID returning list of train movements and schedule data" in evaluateStream {
 
     val expectedTrainId  = TrainId("1234567")
     val scheduleTrainId  = ScheduleTrainId("7234AD")
@@ -62,8 +65,7 @@ class MovementHttpServiceTest extends FlatSpec {
       Some(MovementPacket.timeStampToString(actualTimestamp1)),
       Some(actualTimestamp1),
       Some(MovementPacket.timeStampToString(actualTimestamp1)),
-      Some(VariationStatus.OnTime),
-      List.empty
+      Some(VariationStatus.OnTime)
     )
     val movementPacket2 = MovementPacket(
       expectedTrainId,
@@ -79,9 +81,11 @@ class MovementHttpServiceTest extends FlatSpec {
       Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
       Some(actualTimestamp2 + 60000),
       Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
-      Some(VariationStatus.Early),
-      List.empty
+      Some(VariationStatus.Early)
     )
+
+    val scheduleRecord =
+      TestData.defaultScheduleRecord.copy(scheduleTrainId = scheduleTrainId, serviceCode = serviceCode)
 
     val activationRecord = TrainActivationMessage(scheduleTrainId,
                                                   serviceCode,
@@ -108,12 +112,14 @@ class MovementHttpServiceTest extends FlatSpec {
         h2DatabaseConfig,
         ActivationLookupConfig(Uri(path = "/"))
       )
+      _        <- Stream.eval(app.scheduleTable.safeInsertRecord(scheduleRecord))
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket2)(expiry = None))
       http     <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
-      response <- Stream.eval(http.expect[List[MovementPacket]](Uri(path = s"/movements/${expectedTrainId.value}")))
+      response <- Stream.eval(http.expect[MovementsPayload](Uri(path = s"/movements/${expectedTrainId.value}")))
     } yield {
-      response should ===(List(movementPacket1, movementPacket2).reverse)
+      response.packets should ===(List(movementPacket1, movementPacket2).reverse)
+      response.scheduleDetails should ===(List(scheduleRecord.toScheduleDetailsRecord(None)))
     }
   }
 

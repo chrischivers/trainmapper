@@ -221,8 +221,10 @@ object ScheduleTablePopulator extends StrictLogging {
 
     private def isScheduleRecord(json: Json) = json.hcursor.downField("JsonScheduleV1").succeeded
 
-    private def isOrdinaryPassengerTrain(decodedScheduleRecord: DecodedScheduleRecord) =
-      TrainCategory.OrdinaryPassengerTrains.contains(decodedScheduleRecord.schedule_segment.CIF_train_category)
+    private def isOrdinaryPassengerTrain(decodedScheduleRecord: DecodedScheduleRecord) = {
+      val category = decodedScheduleRecord.schedule_segment.CIF_train_category.value.toUpperCase()
+      category == "" || category.startsWith("O") || category.startsWith("X")
+    }
 
     private def isPermanentSchedule(decodedScheduleRecord: DecodedScheduleRecord) =
       decodedScheduleRecord.CIF_stp_indicator == "P"

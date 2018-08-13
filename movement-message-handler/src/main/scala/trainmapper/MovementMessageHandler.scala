@@ -47,41 +47,30 @@ object MovementMessageHandler extends StrictLogging {
     db.withTransactor(databaseConfig)() { dbTransactor =>
       for {
         cache            <- fs2.Stream.emit(MovementPacketCache(redisClient))
-        httpService      <- fs2.Stream.emit(MovementsHttp(cache))
-        activationClient <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
-        stopReference    <- fs2.Stream.emit(StopReference(railwaysCodesClient))
         scheduleTable    <- fs2.Stream.emit(ScheduleTable(dbTransactor))
         polylineTable    <- fs2.Stream.emit(PolylineTable(dbTransactor))
+        httpService      <- fs2.Stream.emit(MovementsHttp(cache, scheduleTable, polylineTable))
+        activationClient <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
+        stopReference    <- fs2.Stream.emit(StopReference(railwaysCodesClient))
+
       } yield
-        MovementMessageHandlerApp(httpService,
-                                  startRabbit(rabbitClient,
-                                              activationClient,
-                                              scheduleTable,
-                                              polylineTable,
-                                              stopReference,
-                                              cache,
-                                              appConfig.movementExpiry),
-                                  scheduleTable,
-                                  cache)
+        MovementMessageHandlerApp(
+          httpService,
+          startRabbit(rabbitClient, activationClient, stopReference, cache, appConfig.movementExpiry),
+          scheduleTable,
+          cache)
 
     }
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
-                             scheduleTable: ScheduleTable,
-                             polylineTable: PolylineTable,
                              stopReference: StopReference,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient,
-                                  stopReference,
-                                  scheduleTable,
-                                  polylineTable,
-                                  cache,
-                                  cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient, stopReference, cache, cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )

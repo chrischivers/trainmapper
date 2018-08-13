@@ -79,8 +79,7 @@ object TestData {
     Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
     Some(defaultMovementTimestamp),
     Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
-    Some(VariationStatus.OnTime),
-    List(defaultScheduleRecord.toScheduleDetailsRecord(None))
+    Some(VariationStatus.OnTime)
   )
 
   def createIncomingMovementMessageJson(trainId: TrainId = defaultTrainId,

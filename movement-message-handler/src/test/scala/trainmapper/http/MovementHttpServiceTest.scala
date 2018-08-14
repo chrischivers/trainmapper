@@ -94,10 +94,11 @@ class MovementHttpServiceTest extends FlatSpec {
                                                   System.currentTimeMillis() - 600000)
 
     for {
-      redisCacheRef   <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient     <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _               <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      redisCacheRef        <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient          <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      outboundMessageQueue <- Stream.eval(fs2.async.mutable.Queue.unbounded[IO, MovementPacket])
+      rabbitSimulator      <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _                    <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
       activationClient <- Stream.eval(
         IO(Client.fromHttpService(StubActivationLookupClient(Map(expectedTrainId -> activationRecord)))))
       railwayCodesClient <- Stream.eval(
@@ -108,6 +109,7 @@ class MovementHttpServiceTest extends FlatSpec {
         rabbitSimulator,
         activationClient,
         railwayCodesClient,
+        outboundMessageQueue,
         ApplicationConfig(0, "", None),
         h2DatabaseConfig,
         ActivationLookupConfig(Uri(path = "/"))

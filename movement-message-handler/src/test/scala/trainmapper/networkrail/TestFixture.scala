@@ -63,19 +63,23 @@ trait TestFixture {
               applicationConfig: ApplicationConfig = defaultApplicationConfig)(f: TestApp => IO[Assertion]) = {
 
     val result = for {
-      redisCacheRef      <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
-      redisClient        <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
-      rabbitSimulator    <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
-      _                  <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
-      httpClient         <- Stream.eval(IO(Client.fromHttpService(StubActivationLookupClient(respondWith = activationRecords))))
-      railwayCodesClient <- Stream.eval(IO(StubRailwayCodesClient(stopReferenceDetails.map(_.withoutLatLng))))
-      app <- MovementMessageHandler.appFrom(redisClient,
-                                            rabbitSimulator,
-                                            httpClient,
-                                            railwayCodesClient,
-                                            applicationConfig,
-                                            h2DatabaseConfig,
-                                            ActivationLookupConfig(Uri(path = "/")))
+      redisCacheRef        <- Stream.eval(Ref[IO, Map[String, ByteStringListAndExpiry]](Map.empty))
+      redisClient          <- Stream.eval(IO(StubRedisListClient(redisCacheRef)))
+      outboundMessageQueue <- Stream.eval(_root_.fs2.async.mutable.Queue.unbounded[IO, MovementPacket])
+      rabbitSimulator      <- Stream.eval(IO(extRabbitFs2.rabbitSimulator))
+      _                    <- Stream.eval(IO(DeclarationExecutor(RabbitConfig.declarations, rabbitSimulator)))
+      httpClient           <- Stream.eval(IO(Client.fromHttpService(StubActivationLookupClient(respondWith = activationRecords))))
+      railwayCodesClient   <- Stream.eval(IO(StubRailwayCodesClient(stopReferenceDetails.map(_.withoutLatLng))))
+      app <- MovementMessageHandler.appFrom(
+        redisClient,
+        rabbitSimulator,
+        httpClient,
+        railwayCodesClient,
+        outboundMessageQueue,
+        applicationConfig,
+        h2DatabaseConfig,
+        ActivationLookupConfig(Uri(path = "/"))
+      )
       _ <- Stream.eval(scheduleRecords.traverse[IO, Unit](rec => app.scheduleTable.safeInsertRecord(rec)))
       _ <- Stream.eval(IO.unit).concurrently(app.rabbitStream) //todo is there a better way?
       testApp = TestApp(app, rabbitSimulator, redisCacheRef)

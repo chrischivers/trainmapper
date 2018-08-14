@@ -86,6 +86,7 @@ object MovementMessageRmqHandler extends StrictLogging {
 
   def apply(activationLookupClient: ActivationLookupClient,
             stopReference: StopReference,
+            outboundQueue: fs2.async.mutable.Queue[IO, MovementPacket],
             cache: ListCache[TrainId, MovementPacket],
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
@@ -109,6 +110,7 @@ object MovementMessageRmqHandler extends StrictLogging {
             msg.variationStatus
           )
           _ <- OptionT.liftF(cache.push(msg.trainId, movementPacket)(cacheExpiry))
+          _ <- OptionT.liftF(outboundQueue.enqueue1(movementPacket))
         } yield ()
 
         result.value.map(_.fold {

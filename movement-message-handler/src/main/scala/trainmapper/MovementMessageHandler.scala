@@ -42,6 +42,7 @@ object MovementMessageHandler extends StrictLogging {
                  rabbitClient: RabbitClient[E],
                  httpClient: Client[IO],
                  railwaysCodesClient: RailwaysCodesClient,
+                 outboundQueue: fs2.async.mutable.Queue[IO, MovementPacket],
                  appConfig: ApplicationConfig,
                  databaseConfig: DatabaseConfig,
                  activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
@@ -58,7 +59,7 @@ object MovementMessageHandler extends StrictLogging {
       } yield
         MovementMessageHandlerApp(
           Router(("/", movementsHttpService), ("/", scheduleHttpService)),
-          startRabbit(rabbitClient, activationClient, stopReference, cache, appConfig.movementExpiry),
+          startRabbit(rabbitClient, activationClient, outboundQueue, stopReference, cache, appConfig.movementExpiry),
           scheduleTable,
           cache
         )
@@ -67,13 +68,14 @@ object MovementMessageHandler extends StrictLogging {
 
   private def startRabbit[E](rabbitClient: RabbitClient[E],
                              activationLookupClient: ActivationLookupClient,
+                             outboundQueue: fs2.async.mutable.Queue[IO, MovementPacket],
                              stopReference: StopReference,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient, stopReference, cache, cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient, stopReference, outboundQueue, cache, cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )
@@ -106,6 +108,7 @@ object MovementMessageHandlerMain extends App {
                                             rabbitClient,
                                             httpClient,
                                             railwayCodesClient,
+                                            outboundMessageQueue,
                                             serverConfig,
                                             databaseConfig,
                                             activationLookupConfig)

@@ -14,7 +14,7 @@ object Map {
 
   @JSExportTopLevel("initialize")
   def initialize() = {
-    val url    = "ws://localhost:8080/ws"
+    val url    = "ws://" + document.location.host + "/ws"
     val socket = new dom.WebSocket(url)
 
     val opts = google.maps.MapOptions(center = new google.maps.LatLng(51.201203, -1.724370),

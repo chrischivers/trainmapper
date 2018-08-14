@@ -6,13 +6,12 @@ import com.itv.bucky.Monad.Id
 import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.{AmqpClient, fs2 => rabbitfs2}
 import com.typesafe.scalalogging.StrictLogging
-import doobie.hikari.HikariTransactor
-import doobie.hikari.syntax.HikariTransactorOps
 import fs2.Stream
+import org.http4s.HttpService
 import org.http4s.client.Client
 import org.http4s.client.blaze.Http1Client
+import org.http4s.server.Router
 import org.http4s.server.blaze.BlazeBuilder
-import org.http4s.{HttpService, Uri}
 import redis.RedisClient
 import trainmapper.ActivationLookupConfig._
 import trainmapper.ServerConfig.ApplicationConfig
@@ -20,10 +19,12 @@ import trainmapper.Shared.{MovementPacket, TrainId}
 import trainmapper.cache.{ListCache, MovementPacketCache}
 import trainmapper.clients.{ActivationLookupClient, RailwaysCodesClient}
 import trainmapper.db.{PolylineTable, ScheduleTable}
-import trainmapper.http.MovementsHttp
+import trainmapper.http.{MovementsHttp, ScheduleHttp}
+import trainmapper.http.MovementsHttp.MovementsHttpResponse
 import trainmapper.networkrail.MovementMessageRmqHandler
 import trainmapper.networkrail.MovementMessageRmqHandler.TrainMovementMessage
 import trainmapper.reference.StopReference
+import trainmapper.server.WebServer
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -46,19 +47,21 @@ object MovementMessageHandler extends StrictLogging {
                  activationLookupConfig: ActivationLookupConfig)(implicit executionContext: ExecutionContext) =
     db.withTransactor(databaseConfig)() { dbTransactor =>
       for {
-        cache            <- fs2.Stream.emit(MovementPacketCache(redisClient))
-        scheduleTable    <- fs2.Stream.emit(ScheduleTable(dbTransactor))
-        polylineTable    <- fs2.Stream.emit(PolylineTable(dbTransactor))
-        httpService      <- fs2.Stream.emit(MovementsHttp(cache, scheduleTable, polylineTable))
-        activationClient <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
-        stopReference    <- fs2.Stream.emit(StopReference(railwaysCodesClient))
+        cache                <- fs2.Stream.emit(MovementPacketCache(redisClient))
+        scheduleTable        <- fs2.Stream.emit(ScheduleTable(dbTransactor))
+        polylineTable        <- fs2.Stream.emit(PolylineTable(dbTransactor))
+        movementsHttpService <- fs2.Stream.emit(MovementsHttp(cache, scheduleTable, polylineTable))
+        scheduleHttpService  <- fs2.Stream.emit(ScheduleHttp(scheduleTable, polylineTable))
+        activationClient     <- fs2.Stream.emit(ActivationLookupClient(activationLookupConfig.baseUri, httpClient))
+        stopReference        <- fs2.Stream.emit(StopReference(railwaysCodesClient))
 
       } yield
         MovementMessageHandlerApp(
-          httpService,
+          Router(("/", movementsHttpService), ("/", scheduleHttpService)),
           startRabbit(rabbitClient, activationClient, stopReference, cache, appConfig.movementExpiry),
           scheduleTable,
-          cache)
+          cache
+        )
 
     }
 
@@ -98,6 +101,7 @@ object MovementMessageHandlerMain extends App {
       redisClient            <- fs2.Stream.emit(RedisClient())
       httpClient             <- Http1Client.stream[IO]()
       railwayCodesClient     <- fs2.Stream.emit(RailwaysCodesClient())
+      outboundMessageQueue   <- fs2.Stream.eval(fs2.async.mutable.Queue.unbounded[IO, MovementPacket])
       app <- MovementMessageHandler.appFrom(redisClient,
                                             rabbitClient,
                                             httpClient,
@@ -105,9 +109,10 @@ object MovementMessageHandlerMain extends App {
                                             serverConfig,
                                             databaseConfig,
                                             activationLookupConfig)
-      _ <- startServer(app.httpService, serverConfig.port).concurrently {
-        app.rabbitStream
-      }
+      httpServices = Router(("/", app.httpService),
+                            ("/", WebServer(outboundMessageQueue, serverConfig.googleMapsApiKey)))
+      _ <- startServer(httpServices, serverConfig.port)
+        .concurrently(app.rabbitStream)
     } yield ()
 
   app.compile.drain.unsafeRunSync()

@@ -33,14 +33,14 @@ import trainmapper.Shared.{
 import trainmapper.StubActivationLookupClient.TrainActivationMessage
 import trainmapper.StubRedisListClient.ByteStringListAndExpiry
 import trainmapper.db.ScheduleTable.ScheduleRecord
-import trainmapper.http.MovementsHttp.MovementsPayload
+import trainmapper.http.MovementsHttp.MovementsHttpResponse
 import trainmapper.networkrail.TestData
 
 class MovementHttpServiceTest extends FlatSpec {
 
   import scala.concurrent.ExecutionContext.Implicits.global
   implicit val futureMonad   = future.futureMonad
-  implicit val entityDecoder = jsonOf[IO, MovementsPayload]
+  implicit val entityDecoder = jsonOf[IO, MovementsHttpResponse]
 
   "Movement message service" should "query cache by train ID returning list of train movements and schedule data" in evaluateStream {
 
@@ -116,7 +116,7 @@ class MovementHttpServiceTest extends FlatSpec {
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket1)(expiry = None))
       _        <- Stream.eval(app.cache.push(expectedTrainId, movementPacket2)(expiry = None))
       http     <- Stream.eval(IO(Client.fromHttpService(app.httpService)))
-      response <- Stream.eval(http.expect[MovementsPayload](Uri(path = s"/movements/${expectedTrainId.value}")))
+      response <- Stream.eval(http.expect[MovementsHttpResponse](Uri(path = s"/movements/${expectedTrainId.value}")))
     } yield {
       response.packets should ===(List(movementPacket1, movementPacket2).reverse)
       response.scheduleDetails should ===(List(scheduleRecord.toScheduleDetailsRecord(None)))

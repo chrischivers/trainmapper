@@ -57,7 +57,7 @@ object MapService {
   def apply[F[_]](googleMapsApiKey: String)(implicit effect: Effect[F]) = {
 
     /*
-    Based one example in:
+    Based on example in:
     https://github.com/davenport-scala/http4s-scalajsexample
      */
 

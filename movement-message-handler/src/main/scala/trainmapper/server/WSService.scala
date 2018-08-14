@@ -8,6 +8,7 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.server.websocket._
 import org.http4s.websocket.WebsocketBits._
 import trainmapper.Shared.MovementPacket
+import trainmapper.http.MovementsHttp.MovementsHttpResponse
 
 object WSService {
 

@@ -7,7 +7,7 @@ import io.circe.generic.semiauto._
 import org.http4s.circe.jsonEncoderOf
 import org.http4s.dsl.io._
 import org.http4s.dsl._
-import org.http4s.{HttpService, QueryParamDecoder}
+import org.http4s.{EntityEncoder, HttpService, QueryParamDecoder}
 import trainmapper.Shared.{LatLng, MovementPacket, ScheduleDetailRecord, TrainId}
 import trainmapper.cache.ListCache
 import org.http4s.circe._
@@ -22,14 +22,13 @@ import scala.concurrent.ExecutionContext
 
 object MovementsHttp extends StrictLogging {
 
-  case class MovementsPayload(packets: List[MovementPacket], scheduleDetails: List[ScheduleDetailRecord])
+  case class MovementsHttpResponse(packets: List[MovementPacket], scheduleDetails: List[ScheduleDetailRecord])
 
-  object MovementsPayload {
-    implicit val encoder: Encoder[MovementsPayload] = deriveEncoder[MovementsPayload]
-    implicit val decoder: Decoder[MovementsPayload] = deriveDecoder[MovementsPayload]
-    implicit val entityEncoder                      = jsonEncoderOf[IO, MovementsPayload]
+  object MovementsHttpResponse {
+    implicit val encoder: Encoder[MovementsHttpResponse]                 = deriveEncoder[MovementsHttpResponse]
+    implicit val decoder: Decoder[MovementsHttpResponse]                 = deriveDecoder[MovementsHttpResponse]
+    implicit val entityEncoder: EntityEncoder[IO, MovementsHttpResponse] = jsonEncoderOf[IO, MovementsHttpResponse]
   }
-  implicit val statusDecoder: QueryParamDecoder[TrainId] = QueryParamDecoder[String].map(TrainId(_))
 
   def apply(cache: ListCache[TrainId, MovementPacket], scheduleTable: ScheduleTable, polylineTable: PolylineTable)(
       implicit executionContext: ExecutionContext): HttpService[IO] =
@@ -47,7 +46,7 @@ object MovementsHttp extends StrictLogging {
                     .polyLineFor(_)
                     .map(schedule.toScheduleDetailsRecord)))
 
-        } yield MovementsPayload(packets, scheduleDetailsRecords).asJson
+        } yield MovementsHttpResponse(packets, scheduleDetailsRecords)
 
         Ok(result)
     }

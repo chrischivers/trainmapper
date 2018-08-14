@@ -168,7 +168,7 @@ lazy val movementMessageHandler = (project in file("movement-message-handler"))
     (managedResources in Compile) += (artifactPath in (frontend, Compile, packageJSDependencies)).value,
     reStart := (reStart dependsOn (fastOptJS in (frontend, Compile))).evaluated,
     watchSources ++= (watchSources in frontend).value,
-    mainClass in reStart := Some("trainmapper.ActivationMessageHandlerMain")
+    mainClass in reStart := Some("trainmapper.MovementMessageHandlerMain")
   )
   .dependsOn(sharedJvm, reference)
 

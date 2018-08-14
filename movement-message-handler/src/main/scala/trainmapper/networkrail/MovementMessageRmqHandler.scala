@@ -80,7 +80,7 @@ object MovementMessageRmqHandler extends StrictLogging {
       }
     }
 
-//    implicit val encoder = deriveEncoder[TrainMovementMessage]
+    implicit val encoder = deriveEncoder[TrainMovementMessage]
     implicit val decoder = deriveDecoder[TrainMovementMessage]
   }
 

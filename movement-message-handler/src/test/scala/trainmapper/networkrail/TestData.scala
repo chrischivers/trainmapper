@@ -9,6 +9,7 @@ import trainmapper.Shared.{
   LatLng,
   LocationType,
   MovementPacket,
+  Polyline,
   ScheduleTrainId,
   ServiceCode,
   StanoxCode,
@@ -19,6 +20,7 @@ import trainmapper.Shared.{
   VariationStatus
 }
 import trainmapper.StubActivationLookupClient.TrainActivationMessage
+import trainmapper.db.PolylineTable.PolylineRecord
 import trainmapper.db.ScheduleTable.ScheduleRecord
 
 object TestData {
@@ -53,7 +55,7 @@ object TestData {
   val defaultScheduleRecord = ScheduleRecord(
     None,
     defaultScheduleTrainId,
-    1,
+    0,
     defaultServiceCode,
     defaultTiplocCode,
     LocationType.OriginatingLocation,
@@ -64,6 +66,8 @@ object TestData {
     defaultMovementDateTime.toLocalDate.plusDays(1),
     Some(1)
   )
+
+  val defaultPolylineRecord = PolylineRecord(1, defaultTiplocCode, TipLocCode("FALMTHT"), Polyline("ABCDEFGHIJK"))
 
   val defaultMovementPacket = MovementPacket(
     defaultTrainId,
@@ -79,7 +83,8 @@ object TestData {
     Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
     Some(defaultMovementTimestamp),
     Some(MovementPacket.timeStampToString(defaultMovementTimestamp)),
-    Some(VariationStatus.OnTime)
+    Some(VariationStatus.OnTime),
+    Some(defaultScheduleRecord.toScheduleDetailsRecord(Some(defaultPolylineRecord.polyline)))
   )
 
   def createIncomingMovementMessageJson(trainId: TrainId = defaultTrainId,

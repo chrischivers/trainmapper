@@ -36,6 +36,7 @@ object MovementMessageHandler extends StrictLogging {
   case class MovementMessageHandlerApp(httpService: HttpService[IO],
                                        rabbitStream: fs2.Stream[IO, Unit],
                                        scheduleTable: ScheduleTable,
+                                       polylineTable: PolylineTable,
                                        cache: ListCache[TrainId, MovementPacket])
 
   def appFrom[E](redisClient: RedisClient,
@@ -59,8 +60,16 @@ object MovementMessageHandler extends StrictLogging {
       } yield
         MovementMessageHandlerApp(
           Router(("/", movementsHttpService), ("/", scheduleHttpService)),
-          startRabbit(rabbitClient, activationClient, outboundQueue, stopReference, cache, appConfig.movementExpiry),
+          startRabbit(rabbitClient,
+                      activationClient,
+                      outboundQueue,
+                      stopReference,
+                      scheduleTable,
+                      polylineTable,
+                      cache,
+                      appConfig.movementExpiry),
           scheduleTable,
+          polylineTable,
           cache
         )
 
@@ -70,12 +79,20 @@ object MovementMessageHandler extends StrictLogging {
                              activationLookupClient: ActivationLookupClient,
                              outboundQueue: fs2.async.mutable.Queue[IO, MovementPacket],
                              stopReference: StopReference,
+                             scheduleTable: ScheduleTable,
+                             polylineTable: PolylineTable,
                              cache: ListCache[TrainId, MovementPacket],
                              cacheExpiry: Option[FiniteDuration]) =
     RequeueOps(rabbitClient)
       .requeueHandlerOf[TrainMovementMessage](
         RabbitConfig.movementQueue.name,
-        MovementMessageRmqHandler(activationLookupClient, stopReference, outboundQueue, cache, cacheExpiry),
+        MovementMessageRmqHandler(activationLookupClient,
+                                  stopReference,
+                                  outboundQueue,
+                                  scheduleTable,
+                                  polylineTable,
+                                  cache,
+                                  cacheExpiry),
         RequeuePolicy(maximumProcessAttempts = 10, 3.minute),
         TrainMovementMessage.unmarshallFromIncomingJson
       )

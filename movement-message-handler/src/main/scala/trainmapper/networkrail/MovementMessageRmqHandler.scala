@@ -3,11 +3,13 @@ package trainmapper.networkrail
 import cats.data.OptionT
 import cats.syntax.traverse._
 import cats.instances.list._
+import cats.instances.option._
 import cats.effect.IO
 import com.itv.bucky.CirceSupport.unmarshallerFromDecodeJson
 import com.itv.bucky.{Ack, RequeueConsumeAction, RequeueHandler}
 import com.typesafe.scalalogging.StrictLogging
 import io.circe.HCursor
+import trainmapper.Shared
 import trainmapper.Shared.{
   EventType,
   MovementPacket,
@@ -87,37 +89,52 @@ object MovementMessageRmqHandler extends StrictLogging {
   def apply(activationLookupClient: ActivationLookupClient,
             stopReference: StopReference,
             outboundQueue: fs2.async.mutable.Queue[IO, MovementPacket],
+            scheduleTable: ScheduleTable,
+            polylineTable: PolylineTable,
             cache: ListCache[TrainId, MovementPacket],
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
-      override def apply(msg: TrainMovementMessage): IO[RequeueConsumeAction] = {
-        val result = for {
-          activationRecord <- OptionT(activationLookupClient.fetch(msg.trainId))
-          movementPacket = MovementPacket(
-            msg.trainId,
-            activationRecord.scheduleTrainId,
-            msg.trainServiceCode,
-            msg.toc,
-            msg.stanoxCode,
-            msg.stanoxCode.flatMap(stopReference.referenceDetailsFor),
-            msg.eventType,
-            msg.actualTimestamp,
-            MovementPacket.timeStampToString(msg.actualTimestamp),
-            msg.plannedTimestamp,
-            msg.plannedTimestamp.map(MovementPacket.timeStampToString),
-            msg.plannedPassengerTimestamp,
-            msg.plannedPassengerTimestamp.map(MovementPacket.timeStampToString),
-            msg.variationStatus
-          )
-          _ <- OptionT.liftF(cache.push(msg.trainId, movementPacket)(cacheExpiry))
-          _ <- OptionT.liftF(outboundQueue.enqueue1(movementPacket))
-        } yield ()
+      override def apply(msg: TrainMovementMessage): IO[RequeueConsumeAction] =
+        if (msg.toc.value == "AAAAAAAA") IO(Ack)
+        else {
+          val result = for {
+            activationRecord <- OptionT(activationLookupClient.fetch(msg.trainId))
+            referenceDetails = msg.stanoxCode.flatMap(stopReference.referenceDetailsFor)
+            schedule <- OptionT.liftF(scheduleTable.scheduleFor(activationRecord.scheduleTrainId))
+            scheduleForTiploc = referenceDetails.flatMap(
+              _.tiploc.flatMap(tiploc => schedule.find(_.tipLocCode == tiploc)))
+            polylineIdToNext = scheduleForTiploc.flatMap(_.polylineIdToNext)
+            polyLineToNext <- OptionT.liftF(
+              polylineIdToNext
+                .traverse[IO, Option[Shared.Polyline]](p => polylineTable.polyLineFor(p))
+                .map(_.flatten))
+            scheduleDetailRecord = scheduleForTiploc.map(_.toScheduleDetailsRecord(polyLineToNext))
+            movementPacket = MovementPacket(
+              msg.trainId,
+              activationRecord.scheduleTrainId,
+              msg.trainServiceCode,
+              msg.toc,
+              msg.stanoxCode,
+              referenceDetails,
+              msg.eventType,
+              msg.actualTimestamp,
+              MovementPacket.timeStampToString(msg.actualTimestamp),
+              msg.plannedTimestamp,
+              msg.plannedTimestamp.map(MovementPacket.timeStampToString),
+              msg.plannedPassengerTimestamp,
+              msg.plannedPassengerTimestamp.map(MovementPacket.timeStampToString),
+              msg.variationStatus,
+              scheduleDetailRecord
+            )
+            _ <- OptionT.liftF(cache.push(msg.trainId, movementPacket)(cacheExpiry))
+            _ <- OptionT.liftF(outboundQueue.enqueue1(movementPacket))
+          } yield ()
 
-        result.value.map(_.fold {
-          logger.info(s"No activation record found for trainId ${msg.trainId} [$msg]")
-          Ack
-        }(_ => Ack))
-      }
+          result.value.map(_.fold {
+            logger.info(s"No activation record found for trainId ${msg.trainId} [$msg]")
+            Ack
+          }(_ => Ack))
+        }
     }
 
   private def emptyStringOptionToNone[A](in: Option[String])(f: String => A): Option[A] =

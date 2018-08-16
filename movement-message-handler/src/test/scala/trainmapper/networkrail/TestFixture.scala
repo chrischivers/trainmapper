@@ -25,6 +25,7 @@ import com.itv.bucky._
 import io.circe.Json
 import trainmapper.ServerConfig.ApplicationConfig
 import cats.syntax.functor._
+import trainmapper.db.PolylineTable.PolylineRecord
 import trainmapper.db.ScheduleTable.ScheduleRecord
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,7 +45,7 @@ trait TestFixture {
   implicit val futureMonad = future.futureMonad
 
   val defaultApplicationConfig = ApplicationConfig(0, "", None)
-  private val h2DatabaseConfig =
+  private def h2DatabaseConfig =
     DatabaseConfig("org.h2.Driver",
                    s"jdbc:h2:mem:${UUID.randomUUID()};DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false",
                    "",
@@ -59,6 +60,7 @@ trait TestFixture {
   def withApp(activationRecords: Map[TrainId, TrainActivationMessage] = Map(
                 TestData.defaultActivationMessage.trainId -> TestData.defaultActivationMessage),
               scheduleRecords: List[ScheduleRecord] = List(TestData.defaultScheduleRecord),
+              polylineRecords: List[PolylineRecord] = List(TestData.defaultPolylineRecord),
               stopReferenceDetails: List[StopReferenceDetailsWithLatLng] = List(TestData.defaultStopReferenceDetails),
               applicationConfig: ApplicationConfig = defaultApplicationConfig)(f: TestApp => IO[Assertion]) = {
 
@@ -81,10 +83,12 @@ trait TestFixture {
         ActivationLookupConfig(Uri(path = "/"))
       )
       _ <- Stream.eval(scheduleRecords.traverse[IO, Unit](rec => app.scheduleTable.safeInsertRecord(rec)))
+      _ <- Stream.eval(polylineRecords.traverse[IO, Unit](rec => app.polylineTable.safeInsertRecord(rec)))
       _ <- Stream.eval(IO.unit).concurrently(app.rabbitStream) //todo is there a better way?
       testApp = TestApp(app, rabbitSimulator, redisCacheRef)
       testResult <- Stream.eval(f(testApp).attempt)
       _          <- Stream.eval(app.scheduleTable.deleteAllRecords)
+      _          <- Stream.eval(app.polylineTable.deleteAllRecords)
 
     } yield testResult.fold(err => throw err, identity)
 

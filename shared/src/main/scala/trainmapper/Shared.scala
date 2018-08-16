@@ -245,7 +245,8 @@ object Shared {
                             plannedTime: Option[String],
                             plannedPassengerTimestamp: Option[Long],
                             plannedPassengerTime: Option[String],
-                            variationStatus: Option[VariationStatus])
+                            variationStatus: Option[VariationStatus],
+                            scheduleToNextStop: Option[ScheduleDetailRecord])
 
   object MovementPacket {
     implicit val encoder: Encoder[MovementPacket] = deriveEncoder[MovementPacket]

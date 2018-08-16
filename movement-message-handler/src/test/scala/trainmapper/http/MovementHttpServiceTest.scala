@@ -65,7 +65,8 @@ class MovementHttpServiceTest extends FlatSpec {
       Some(MovementPacket.timeStampToString(actualTimestamp1)),
       Some(actualTimestamp1),
       Some(MovementPacket.timeStampToString(actualTimestamp1)),
-      Some(VariationStatus.OnTime)
+      Some(VariationStatus.OnTime),
+      None
     )
     val movementPacket2 = MovementPacket(
       expectedTrainId,
@@ -81,7 +82,8 @@ class MovementHttpServiceTest extends FlatSpec {
       Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
       Some(actualTimestamp2 + 60000),
       Some(MovementPacket.timeStampToString(actualTimestamp2 + 60000)),
-      Some(VariationStatus.Early)
+      Some(VariationStatus.Early),
+      None
     )
 
     val scheduleRecord =

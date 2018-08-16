@@ -17,6 +17,7 @@ trait PolylineTable extends Table[PolylineRecord] {
   def polylineIdFor(fromTipLoc: TipLocCode, toTipLoc: TipLocCode): IO[Option[Int]]
   def polyLineFor(id: Int): IO[Option[Polyline]]
   def insertAndRetrieveInsertedId(fromTiploc: TipLocCode, toTiploc: TipLocCode, polyline: Polyline): IO[Int]
+  def deleteAllRecords: IO[Unit]
 }
 
 object PolylineTable {
@@ -87,5 +88,7 @@ object PolylineTable {
         .query[Polyline]
         .option
         .transact(db)
+
+    override def deleteAllRecords: IO[Unit] = sql"""DELETE FROM polylines""".update.run.transact(db).void
   }
 }

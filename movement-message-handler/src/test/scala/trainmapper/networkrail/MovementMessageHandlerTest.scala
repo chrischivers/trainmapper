@@ -6,6 +6,8 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers._
 import trainmapper.Shared
 import trainmapper.Shared._
+import trainmapper.db.ScheduleTable.ScheduleRecord
+import trainmapper.networkrail.TestData._
 
 class MovementMessageHandlerTest extends FlatSpec with TestFixture {
 
@@ -30,9 +32,8 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
   }
 
   it should "decode multiple incoming movement with the same train id messages and push to list" in {
-
     val incomingMessage1 = TestData.createIncomingMovementMessageJson()
-    val stanoxCode2      = StanoxCode("STANOX2")
+    val stanoxCode2      = StanoxCode("85515")
     val timestamp2       = TestData.defaultMovementTimestamp + 60000
 
     val incomingMessage2 = TestData.createIncomingMovementMessageJson(stanoxCode = stanoxCode2,
@@ -49,7 +50,23 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
                                      Some(stanoxCode2),
                                      Some(LatLng(50.14833146498763, -5.0648652929940035)))
 
-    withApp(stopReferenceDetails = List(stopReferenceDetails1, stopReferenceDetails2)) { app =>
+    val scheduleRecord2 = ScheduleRecord(
+      None,
+      defaultScheduleTrainId,
+      1,
+      defaultServiceCode,
+      TipLocCode("FALMTHT"),
+      LocationType.IntermediateLocation,
+      Some(defaultMovementDateTime.toLocalTime.plusMinutes(4)),
+      Some(defaultMovementDateTime.toLocalTime.plusMinutes(5)),
+      DaysRun("1111100"),
+      defaultMovementDateTime.toLocalDate,
+      defaultMovementDateTime.toLocalDate.plusDays(1),
+      Some(2)
+    )
+
+    withApp(stopReferenceDetails = List(stopReferenceDetails1, stopReferenceDetails2),
+            scheduleRecords = List(TestData.defaultScheduleRecord, scheduleRecord2)) { app =>
       for {
         _         <- app.publishIncoming(incomingMessage1)
         _         <- app.publishIncoming(incomingMessage2)
@@ -73,7 +90,8 @@ class MovementMessageHandlerTest extends FlatSpec with TestFixture {
           plannedPassengerTime = Some(MovementPacket.timeStampToString(timestamp2)),
           plannedPassengerTimestamp = Some(timestamp2),
           eventType = EventType.Departure,
-          stopReferenceDetails = Some(stopReferenceDetails2)
+          stopReferenceDetails = Some(stopReferenceDetails2),
+          scheduleToNextStop = Some(scheduleRecord2.toScheduleDetailsRecord(None))
         )
         fromCache should ===(List(expectedRecord1, expectedRecord2).reverse)
       }

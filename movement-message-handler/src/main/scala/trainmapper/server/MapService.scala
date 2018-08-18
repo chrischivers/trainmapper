@@ -67,7 +67,7 @@ object MapService {
     import dsl._
 
     val googleMapsDep =
-      s"https://maps.googleapis.com/maps/api/js?key=$googleMapsApiKey&callback=initialize"
+      s"https://maps.googleapis.com/maps/api/js?key=$googleMapsApiKey&libraries=geometry&callback=initialize"
 
     def getResource(pathInfo: String) = effect.delay(this.getClass.getResource(pathInfo))
 

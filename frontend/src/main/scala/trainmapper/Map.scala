@@ -32,24 +32,29 @@ object Map {
 
     def onMessage(msg: MessageEvent): Unit =
       parse(msg.data.toString).flatMap(_.as[MovementPacket]) match {
-        case Left(err)     => console.error(s"Error decoding incoming event message $msg. Error [$err]")
+        case Left(err) => console.error(s"Error decoding incoming event message $msg. Error [$err]")
         case Right(packet) =>
-          //todo remove gets
-          val newLatLng = new google.maps.LatLng(packet.stopReferenceDetails.get.latLng.get.lat,
-                                                 packet.stopReferenceDetails.get.latLng.get.lng)
-          activeTrains.get(packet.trainId) match {
-            case Some(existingMarker) =>
-              existingMarker.setPosition(newLatLng)
-              assert(activeTrains(packet.trainId).getPosition() == newLatLng)
-            case None =>
-              val marker = new google.maps.Marker(
-                google.maps.MarkerOptions(
-                  position = newLatLng,
-                  map = gmap,
-                  title = packet.trainId.value
-                ))
-              activeTrains.update(packet.trainId, marker)
+          console.log(packet.toString)
+          for {
+            stopReferenceDetails <- packet.stopReferenceDetails
+            latLng               <- stopReferenceDetails.latLng
+          } yield {
+            val position = new google.maps.LatLng(latLng.lat, latLng.lng)
+            activeTrains.get(packet.trainId) match {
+              case Some(existingMarker) =>
+                existingMarker.setPosition(position)
+                assert(activeTrains(packet.trainId).getPosition() == position)
+              case None =>
+                val marker = new google.maps.Marker(
+                  google.maps.MarkerOptions(
+                    position = position,
+                    map = gmap,
+                    title = packet.trainId.value
+                  ))
+                activeTrains.update(packet.trainId, marker)
+            }
           }
+
       }
   }
 }

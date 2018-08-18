@@ -95,7 +95,7 @@ object MovementMessageRmqHandler extends StrictLogging {
             cacheExpiry: Option[FiniteDuration]) =
     new RequeueHandler[IO, TrainMovementMessage] {
       override def apply(msg: TrainMovementMessage): IO[RequeueConsumeAction] =
-        if (msg.toc.value == "AAAAAAAA") IO(Ack)
+        if (msg.toc.value != "88") IO(Ack)
         else {
           val result = for {
             activationRecord <- OptionT(activationLookupClient.fetch(msg.trainId))
